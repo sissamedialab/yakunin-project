@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archives>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive0] -->
+  <archive>
+    <name>01-test.tex</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/01-test.tex as copy</line>
+      <line>INFO Successfully compiled 01-test.tex</line>
+      <line>DEBUG ready to compile 01-test.tex in 💩/work with command latexmk -pdf -interaction=nonstopmode 01-test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive1] -->
+  <archive>
+    <name>01-test.tex</name>
+    <command>compile</command>
+    <options>
+      <option name="tex_engine" value="latexmk -dvi -pdfps"/>
+    </options>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/01-test.tex as copy</line>
+      <line>INFO Successfully compiled 01-test.tex</line>
+      <line>DEBUG ready to compile 01-test.tex in 💩/work with command latexmk -dvi -pdfps -interaction=nonstopmode 01-test.tex</line>
+    </expected-lines>
+    <expected-files>
+      <file>01-test.dvi</file>
+      <file>01-test.ps</file>
+    </expected-files>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive2] -->
+  <archive>
+    <name>01-test.tex</name>
+    <command>watermark</command>
+    <options>
+      <option name="text" value="ciao"/>
+      <option name="x" value="10"/>
+      <option name="y" value="200"/>
+    </options>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/01-test.tex as copy</line>
+      <line>INFO Successfully compiled 01-test.tex</line>
+
+  <!-- NO: __DEBUG watermark requested: "ciao"@(10, 200)__ -->
+
+  <!-- because the above does not appear in the task log -->
+      <line>DEBUG Watermark applied.</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive3] -->
+  <archive>
+    <name>02-test.tex.gz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/02-test.tex.gz as gz</line>
+      <line>INFO Successfully compiled 02-test.tex</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive4] -->
+  <archive>
+    <name>03-test.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/03-test.zip as zip</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive5] -->
+  <archive>
+    <name>04-test.tar.gz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/04-test.tar.gz as gztar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive6] -->
+  <archive>
+    <name>05-test.tar.bz2</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/05-test.tar.bz2 as bztar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive7] -->
+  <archive>
+    <name>06-test.tgz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/06-test.tgz as gztar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive8] -->
+  <archive>
+    <name>07-test-tgz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/07-test-tgz as gztar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive9] -->
+  <archive>
+    <name>08-test-zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/08-test-zip as zip</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive10] -->
+  <archive>
+    <name>09-test-texgz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/09-test-texgz as gz</line>
+      <line>INFO Successfully compiled 09-test-texgz</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive11] -->
+  <archive>
+    <name>10-test-tex</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/10-test-tex as copy</line>
+      <line>INFO Successfully compiled 10-test-tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive12] -->
+  <archive>
+    <name>11-test.tex.bz2</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/11-test.tex.bz2 as bz</line>
+      <line>INFO Successfully compiled 11-test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive13] -->
+  <archive>
+    <name>12-test-tex-bz2</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/12-test-tex-bz2 as bz</line>
+      <line>INFO Successfully compiled 12-test-tex-bz2</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive14] -->
+  <archive>
+    <name>13-test-tar-bz2</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/13-test-tar-bz2 as bztar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+
+
+
+
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive15] -->
+  <archive>
+    <name>19-test.tar</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/19-test.tar as tar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive16] -->
+  <archive>
+    <name>20-test-tar</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/20-test-tar as tar</line>
+      <line>INFO Successfully compiled test.tex</line>
+    </expected-lines>
+  </archive>
+
+
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive17] -->
+  <archive>
+    <name>30422-JINST-DTT-LIDAR-PN.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30422-JINST-DTT-LIDAR-PN.zip as zip</line>
+      <line>WARNING Probably a "\cite" inside mathematics. Please check line 71. Please see FAQ-123.</line>
+      <line>WARNING Probably a "\cite" inside mathematics. Please check line 124. Please see FAQ-123.</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive18] -->
+  <archive>
+    <name>30437-Generative_adversarial_networks.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30437-Generative_adversarial_networks.zip as zip</line>
+      <line>INFO TeX master (found 1 with \documentclass): main.tex</line>
+      <line>INFO Successfully compiled main.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive19] -->
+  <archive>
+    <name>30440-neg-delay-3.zip</name>
+
+  <!-- compilation timeout must be > 3 sec. -->
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30440-neg-delay-3.zip as zip</line>
+      <line>INFO Successfully compiled main.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive20] -->
+  <archive>
+    <name>30445-Draft.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30445-Draft.zip as zip</line>
+      <line>INFO Successfully compiled Draft.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive21] -->
+  <archive>
+    <name>30449-jhep-submission 2.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30449-jhep-submission 2.zip as zip</line>
+      <line>INFO Successfully compiled general-pistons_Final_jhep.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive22] -->
+  <archive>
+    <name>30456-Paper.rar</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30456-Paper.rar as any</line>
+      <line>INFO Removed all occurrences of U202C from Paper.tex.</line>
+      <line>INFO Successfully compiled Paper.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive23] -->
+  <archive>
+    <name>30471-JCAP_R1.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30471-JCAP_R1.zip as zip</line>
+      <line>WARNING Command 💩 'jcapArxiv-version-4.tex']' returned non-zero exit status 12.</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive24] -->
+  <archive>
+    <name>30480-Agudov_JSTAT_15.09.19.zip</name>
+
+  <!-- compilation timeout must be > 3 sec. -->
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30480-Agudov_JSTAT_15.09.19.zip as zip</line>
+      <line>INFO Stochastic model Memristor_Kolya_JSTAT_14.09.2019.tex recoded from cp1252 to utf-8</line>
+      <line>INFO Successfully compiled Stochastic model Memristor_Kolya_JSTAT_14.09.2019.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive25] -->
+  <archive>
+    <name>30498-SEVRISMONRITresub2.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30498-SEVRISMONRITresub2.zip as zip</line>
+      <line>INFO TeX master (found 2 with \documentclass): SEVRISMONRIT.tex</line>
+      <line>INFO Successfully compiled SEVRISMONRIT.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive26] -->
+  <archive>
+    <name>30527-1811_10998.tar.gz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/30527-1811_10998.tar.gz as gztar</line>
+      <line>INFO Successfully compiled paper-rev-JHEP.tex</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive27] -->
+  <archive>
+    <name>9578-dg.tar.gz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/9578-dg.tar.gz as gztar</line>
+      <line>INFO Thedifferentglass.tex recoded from iso-8859-1 to utf-8</line>
+      <line>WARNING Command 💩 'Thedifferentglass.tex']' returned non-zero exit status 12.</line>
+      <line>WARNING There is a unicode char that latex does not know how to handle. The char is U+00A8. Please check line 27. Please see FAQ-123.</line>
+      <line>WARNING There is a unicode char that latex does not know how to handle. The char is U+00A6. Please check line 27. Please see FAQ-123.</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive28] -->
+  <archive type="preprint">
+    <name preprint="JHEP_001P_0119">1812_09525</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/1812_09525 as copy</line>
+      <line>INFO Successfully compiled 1812_09525</line>
+    </expected-lines>
+  </archive>
+
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive29] -->
+  <archive type="preprint">
+    <name preprint="JHEP_007P_0119">dsNLee.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/dsNLee.zip as zip</line>
+      <line>INFO dsNLEE.tex recoded from iso-8859-1 to utf-8</line>
+      <line>INFO Successfully compiled dsNLEE.tex</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive30] -->
+  <archive type="preprint">
+    <name preprint="JHEP_005P_0119">????? 4.zip</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/????? 4.zip as zip</line>
+      <line>INFO Successfully compiled swampland_Q_draft.tex</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive31] -->
+  <archive type="preprint">
+    <name preprint="JHEP_004P_0119">publicationTL2016.tar.gz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/publicationTL2016.tar.gz as gztar</line>
+      <line>INFO TeX master (found 1 with \documentclass): ANA-TOPQ-2017-07-PAPER.tex</line>
+      <line>WARNING Command '['latexmk', '-pdf', '-interaction=nonstopmode', 'ANA-TOPQ-2017-07-PAPER.tex']' returned non-zero exit status 12.</line>
+      <line>WARNING bbl version mismatch. This can lead to errors. Please see FAQ-123</line>
+      <line>ERROR "\sortlist" is undefined. Please check FAQ-123.</line>
+      <line>ERROR "@\blx@dlist@name" is undefined. Please check FAQ-123.</line>
+      <line>ERROR "{\blx@dlist@type" is undefined. Please check FAQ-123.</line>
+      <line>ERROR No pdf file produced! Compilation fails.</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive32] -->
+  <archive type="preprint">
+    <name preprint="JHEP_236P_0719">1907_10003.tar.gz</name>
+    <expected-lines>
+      <line>INFO Unpacked 💩submission/1907_10003.tar.gz as gztar</line>
+      <line>INFO TeX master (found 2 with \documentclass): main.tex</line>
+      <line>WARNING Command '['latexmk', '-pdf', '-interaction=nonstopmode', 'main.tex']' returned non-zero exit status 12.</line>
+      <line>WARNING There is a unicode char that latex does not know how to handle. The char is U+2028. Please check line 302. Please see FAQ-123.</line>
+    </expected-lines>
+  </archive>
+
+
+  <!-- tested the following, but nothing special (archive ok, master ok, compilation ok) -->
+
+  <!-- JHEP_001P_0419 -->
+
+  <!-- JHEP_002P_0119 -->
+
+  <!-- JHEP_003P_0119 -->
+
+  <!-- JHEP_006P_0119 -->
+
+  <!-- JHEP_008P_0119 -->
+
+  <!-- JHEP_023P_0719 -->
+
+  <!-- JHEP_120P_0319 -->
+
+  <!-- JHEP_125P_0519 -->
+
+  <!-- JHEP_157P_0219 -->
+
+  <!-- JHEP_181P_0219 -->
+
+  <!-- JHEP_188P_0519 -->
+
+  <!-- JHEP_236P_0619 -->
+
+  <!-- JHEP_237P_0419 -->
+
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive33] -->
+  <archive id="doc-to-pdf">
+    <name>22-test.docx</name>
+    <command>mkpdf</command>
+    <expected-lines>
+      <line>INFO DOCX transformed to PDF.</line>
+      <line>INFO Unpacked 💩/submission/22-test.docx as copy</line>
+      <line>DEBUG Mime type of "💩22-test.docx" appears to be "application/vnd.openxmlformats-officedocument.wordprocessingml.document"</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive34] -->
+  <archive id="doc-to-pdf_timeout">
+    <name>22-test.docx</name>
+    <command>mkpdf</command>
+    <options>
+      <option name="timeout_mkpdf" value="0.1" is-float="true"/>
+    </options>
+    <expected-lines>
+      <line>DEBUG Mime type of "💩22-test.docx" appears to be "application/vnd.openxmlformats-officedocument.wordprocessingml.document"</line>
+      <line>INFO Unpacked 💩/submission/22-test.docx as copy</line>
+      <line>ERROR doc-to-pdf conversion timed out after 0.1 seconds</line>
+    </expected-lines>
+  </archive>
+
+  <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive35] -->
+  <archive id="doc-to-pdf_url">
+    <name>22-test.docx</name>
+    <command>mkpdf</command>
+    <options>
+      <option name="url_doc2pdf" value="http://winkow.medialab.sissa.it/saveaspdf"/>
+    </options>
+    <expected-lines>
+      <line>INFO DOCX transformed to PDF.</line>
+      <line>INFO Unpacked 💩/submission/22-test.docx as copy</line>
+      <line>DEBUG Mime type of "💩22-test.docx" appears to be "application/vnd.openxmlformats-officedocument.wordprocessingml.document"</line>
+      <line>DEBUG DOCX 22-test.docx ready to be sent to doc-to-pdf server http://winkow.medialab.sissa.it/saveaspdf.</line>
+    </expected-lines>
+  </archive>
+
+
+
+</archives>
