@@ -1,5 +1,0 @@
-\documentclass{article}
-\usepackage{datetime}
-\begin{document}
-TEST \today \currenttime
-\end{document}
