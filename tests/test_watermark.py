@@ -1,14 +1,14 @@
-# -*- encoding: utf-8 -*-
-
 "Test the application of a watermark"
-import os
 import io
+import os
 from subprocess import check_output
+
 import numpy as np
-from PIL import Image
 import pytest
-from yakunin.archive import Archive
 from conftest import ARCHIVES_DIR, well_formed
+from PIL import Image
+
+from yakunin.archive import Archive
 
 
 def pdfs_equals_p(file_a, file_b):
@@ -20,23 +20,21 @@ def pdfs_equals_p(file_a, file_b):
     num_pages = get_num_pages(file_a)
     assert num_pages == get_num_pages(file_b)
 
-    for page in range(1, num_pages+1):
-
+    for page in range(1, num_pages + 1):
         # from PIL.Image to np array
         # https://stackoverflow.com/a/14140796/1581629
-        array_a = np.array(
-            pdftopng(file_a, page))
+        array_a = np.array(pdftopng(file_a, page))
 
-        array_b = np.array(
-            pdftopng(file_b, page))
+        array_b = np.array(pdftopng(file_b, page))
 
         # np subtraction does not do saturation
         # (i.e. it can overflow)
         # https://stackoverflow.com/a/45817868/1581629
-        # array_c = np.subtract(array_a, array_b)
+        # array_c = np.subtract(array_a, array_b)  # NOQA E800
 
+        # TODO: review me
         # https://stackoverflow.com/a/8538444/1581629
-        # Image.fromarray(array_c).save("/tmp/aaaa.png")
+        # Image.fromarray(array_c).save("/tmp/aaaa.png")  # NOQA E800
 
         should_be_zero = np.subtract(array_a, array_b).sum()
 
@@ -50,12 +48,18 @@ def pdfs_equals_p(file_a, file_b):
 def pdftopng(pdffile, pagenumber, width=900):
     "Rasterizes a page of a PDF."
     pngbytes = check_output(
-        args=["pdftoppm",
-              "-f", str(pagenumber),
-              "-l", str(pagenumber),
-              "-scale-to", str(width),
-              "-png",
-              pdffile])
+        args=[
+            "pdftoppm",
+            "-f",
+            str(pagenumber),
+            "-l",
+            str(pagenumber),
+            "-scale-to",
+            str(width),
+            "-png",
+            pdffile,
+        ]
+    )
     img = Image.open(io.BytesIO(pngbytes))
     return img.convert("RGB")
 
@@ -93,11 +97,13 @@ def test_simple_pdf():
 # who cares...
 
 KNOWN_POSITIONS = (
-    ('14-test-wm-0-100.pdf', 0, 100),
-    ('14-test-wm-300-400.pdf', 300, 400),
-    ('14-test-wm-580-830.pdf', 580, 830),
+    ("14-test-wm-0-100.pdf", 0, 100),
+    ("14-test-wm-300-400.pdf", 300, 400),
+    ("14-test-wm-580-830.pdf", 580, 830),
 )
-@pytest.mark.parametrize('target_pdf_file,x,y', KNOWN_POSITIONS)
+
+
+@pytest.mark.parametrize("target_pdf_file,x,y", KNOWN_POSITIONS)
 def test_position(target_pdf_file, x, y):
     "Give different heights to the wm function"
     pdf_file = "14-test.pdf"
@@ -113,8 +119,6 @@ def test_position(target_pdf_file, x, y):
         assert archive.main_pdf in files
 
         os.chdir(tmp_dir)
-        # import pdb
-        # pdb.set_trace()
         assert pdfs_equals_p(archive.main_pdf, target_pdf_file_path)
 
 

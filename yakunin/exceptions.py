@@ -2,12 +2,12 @@
 
 
 class UnknownArchiveFormat(Exception):
-    'x'
+    "x"
 
 
 class NoTeXMaster(Exception):
-    'x'
+    "x"
 
 
 class PDFGenerationFailure(Exception):
-    'x'
+    "x"

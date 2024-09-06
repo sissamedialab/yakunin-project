@@ -1,0 +1,67 @@
+default:
+  image: python:3.11
+  tags:
+    - inasset
+
+  cache:
+    key: cache-default
+    paths:
+      - .cache
+
+variables:
+  PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
+
+stages:
+  - test
+  - build
+
+include:
+  - project: 'wjs/wjs-profile-project'
+    ref: 'wjs-develop'
+    file: '.gitlab-ci-pre-commit.yml'
+  - project: 'wjs/wjs-profile-project'
+    ref: 'wjs-develop'
+    file: '.gitlab-ci-pkg-build-and-upload.yml'
+
+
+build-image-for-tests:
+  image: docker:dind
+  stage: test
+  when: manual
+  variables:
+    TAG: registry.gitlab.sissamedialab.it/wjs/jcomassistant-project/ja-plus:latest
+  script:
+    - docker build --tag $TAG .
+    - docker push $TAG
+
+
+run-tests:
+  except:
+    - tags
+  stage: test
+  image: registry.gitlab.sissamedialab.it/wjs/jcomassistant-project/ja-plus:latest
+
+  script:
+    - pip install --cache $PIP_CACHE_DIR --break-system-packages --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple .
+    - pytest -n 16
+
+
+pre-commit:
+  # Always run linting, except for tags
+  except:
+    - tags
+  extends:
+    - .run-pre-commit
+
+
+upload-package:
+  only:
+    - tags
+  extends:
+    - .upload-package
+
+
+upload-package-manual:
+  when: manual
+  extends:
+    - .upload-package

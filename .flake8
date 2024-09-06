@@ -1,0 +1,6 @@
+[flake8]
+# exclude = ["./.*"]
+max-line-length = 119
+inline-quotes = "double"
+no-accept-encodings = true
+banned-modules = { __future__ = "this project supports python3 only" }

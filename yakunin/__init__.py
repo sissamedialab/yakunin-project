@@ -1,20 +1,26 @@
 "Setup & entry point"
 
-import os
-import sys
-import logging
-import logging.config
 import argparse
 import json
+import logging
+import logging.config
+import os
+import sys
+
 from yakunin.archive import Archive
-from yakunin.exceptions import UnknownArchiveFormat, NoTeXMaster
-from yakunin.lib import YAKUNIN_LOGGER, TASK_LOGGER
+from yakunin.exceptions import NoTeXMaster, UnknownArchiveFormat
+from yakunin.lib import TASK_LOGGER, YAKUNIN_LOGGER, verify_environment
 
 
 def merge_with_config_file(args):
-    """If we have a config file, load it and merge it with the command-line.
-    Command line args will override config-file directives
-    (this is also why I don't use defaults in command line args)."""
+    """Merge config file.
+
+    If we have a config file, load it and merge it with the
+    command-line.  Command line args will override config-file
+    directives (this is also why I don't use defaults in command line
+    args).
+
+    """
     # This function is called after the command line has been parsed
     # (this function is also called by the setup_config fixture of pytest)
 
@@ -30,20 +36,17 @@ def merge_with_config_file(args):
         with open(args.config_file) as config_file_content:
             config = json.load(config_file_content)
             # read LOGGING config
-            logging_config = config.get('LOGGING', None)
+            logging_config = config.get("LOGGING", None)
             logging.config.dictConfig(logging_config)
 
             # read GENERAL config
-            general_config = config.get('GENERAL', None)
+            general_config = config.get("GENERAL", None)
             if general_config is not None:
                 # override confi-file with command line
                 general_config.update(vars(args))
 
                 # add (or reset) arguments to arparse's Namespace
-                map_obj = map(lambda x: setattr(args,
-                                                x[0],
-                                                x[1]),
-                              general_config.items())
+                map_obj = [setattr(args, x[0], x[1]) for x in general_config.items()]
                 # (map is lazy: just retruns a map object,
                 #  no action has yet been done;
                 #  call "list" to "execute")
@@ -55,22 +58,17 @@ def merge_with_config_file(args):
     # set defaults
     # TODO: manage defaults to appear on command line
     defaults = {
-        'log': logging.DEBUG,
-        'pdfa_url': "https://medialab.sissa.it/ud/medusa/topdfa",
-        'pitstop_url': "https://medialab.sissa.it/ud/medusa/pitstop_fix",
-        }
-    for (key, value) in defaults.items():
-        # print(key, value)
+        "log": logging.DEBUG,
+        "pdfa_url": "https://medialab.sissa.it/ud/medusa/topdfa",
+        "pitstop_url": "https://medialab.sissa.it/ud/medusa/pitstop_fix",
+    }
+    for key, value in defaults.items():
         if not hasattr(args, key):
             setattr(args, key, value)
-        #     print(f"set {key} to {value}")
-        # else:
-        #     print(f"{key} has value {getattr(args, f'{key}')}")
 
 
 def main():
-    "Read config, command line and run requested command"
-
+    """Read config, command line and run requested command."""
     # The command-line parser is a bit compicated.
     # compile this tikz code to get a representation:
 
@@ -85,7 +83,7 @@ def main():
     #     options/.style={draw=black!10,anchor=west,text width=11ex},
     #     info/.style={pos=.5,color=black!20,anchor=north west},
     #     parent/.style={dashed,color=black!20,behind path}
-    #   ]
+    #   ]  %% # noqa E800
     #   \node[parser] (main) at (0,0) {main};
     #   \node[options] (main-options) at (main.east)  {-{}-config, -{}-log};
     #
@@ -156,7 +154,7 @@ def main():
     #
 
     parser = argparse.ArgumentParser(
-        description=r'''
+        description=r"""
  __________________
 /                  \
 | Work In Progress |
@@ -172,131 +170,166 @@ def main():
     /'\_   _/`\
     \___)=(___/
 
-''',
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
     # for default path of config file, see also data_files in setup.py
     parser.add_argument(
-        "-c", "--config-file",
+        "-c",
+        "--config-file",
         default=os.path.join(sys.prefix, "etc", "yakunin.json"),
-        help="logging, tex engine, timouts, etc.; default to %(default)s")
+        help="logging, tex engine, timouts, etc.; default to %(default)s",
+    )
 
     parser.add_argument(
-        "-l", "--log",
-        choices=["ERROR",
-                 "WARNING",
-                 "INFO",
-                 "DEBUG"],
-        # default="DEBUG",
-        help='set logging level for task-logger (overrides config file).'
-        ' Default: "%(default)s"')
+        "-l",
+        "--log",
+        choices=["ERROR", "WARNING", "INFO", "DEBUG"],
+        default="DEBUG",
+        help="set logging level for task-logger (overrides config file)."
+        ' Default: "%(default)s"',
+    )
 
-    commands = parser.add_subparsers(title="Commands", dest='command')
+    commands = parser.add_subparsers(title="Commands", dest="command")
 
     compile_parser_generic = argparse.ArgumentParser(add_help=False)
     compile_parser_generic.add_argument(
-        "--tex-master",
-        help="a file with path relative to the extracted archive")
-
-    tex_engine_choices = dict(
-        pdflatex='latexmk -pdf',
-        latex='latexmk -dvi -pdfps',             # tex → dvi → pdf
-        pdftex="latexmk -pdf -pdflatex=pdftex",  # TeX, not LaTeX
-        tex='latexmk -dvi -latex=tex',
-        xelatex="latexmk -pdfxe",
+        "--tex-master", help="a file with path relative to the extracted archive"
     )
+
+    tex_engine_choices = {
+        "pdflatex": "latexmk -pv- -pdf",
+        "latex": "latexmk -pv- -dvi -pdfps",  # tex → dvi → pdf
+        "pdftex": "latexmk -pv- -pdf -pdflatex=pdftex",  # TeX, not LaTeX
+        "tex": "latexmk -pv- -dvi -latex=tex",
+        "xelatex": "latexmk -pv- -pdfxe",
+    }
     compile_parser_generic.add_argument(
         "--tex_engine",
         choices=tex_engine_choices.keys(),
-        # default="pdflatex",
-        help='tex engine to use (will be made into an option for latexmk)')
+        default="pdflatex",
+        help="tex engine to use (will be made into an option for latexmk)",
+    )
     compile_parser_generic.add_argument(
         "--timeout-compilation",
         type=float,
-        # default=3,
-        help="compilation timeout (defaults to %(default)s)")
+        default=13,
+        help="compilation timeout (defaults to %(default)s)",
+    )
+    compile_parser_generic.add_argument("archive", help="Archive to process.")
 
     # TODO: add generic compilation arguments and/or commandline
-    compile_parser = commands.add_parser(
-        'compile',
+    commands.add_parser(
+        "tex_compile",
         help="Compile a tex source/archive",
-        parents=[compile_parser_generic, ])
+        parents=[
+            compile_parser_generic,
+        ],
+    )
 
     mkpdf_parser_generic = argparse.ArgumentParser(add_help=False)
     mkpdf_parser_generic.add_argument(
         "--timeout-mkpdf",
         type=float,
-        help="how many seconds to wait for odt→pdf or docx→pdf transformation")
+        help="how many seconds to wait for odt→pdf or docx→pdf transformation",
+    )
     mkpdf_parser_generic.add_argument(
-        "--url-doc2pdf",
-        help="url to call for docx→pdf transformation")
+        "--url-doc2pdf", help="url to call for docx→pdf transformation"
+    )
 
-    mkpdf_parser = commands.add_parser(
-        'mkpdf',
+    commands.add_parser(
+        "mkpdf",
         help="Generate a pdf file.",
-        parents=[mkpdf_parser_generic, compile_parser_generic, ])
+        parents=[
+            mkpdf_parser_generic,
+            compile_parser_generic,
+        ],
+    )
 
     watermark_parser_generic = argparse.ArgumentParser(add_help=False)
     watermark_parser_generic.add_argument(
         "--text",
-        # required=True,  # cannot set... gets shared...
-        help="string to use as watermark (ascii only)")
+        # cannot set required=True because it'd get shared with other commands
+        help="string to use as watermark (ascii only)",
+    )
     watermark_parser_generic.add_argument(
         "-x",
-        # default='550',
-        help="watermark X position (defaults to %(default)s)")
+        default="550",
+        help="watermark X position (defaults to %(default)s)",
+    )
     watermark_parser_generic.add_argument(
         "-y",
-        # default='620',
-        help="watermark Y position (defaults to %(default)s)")
-    watermark_parser = commands.add_parser(
-        'watermark',
+        default="620",
+        help="watermark Y position (defaults to %(default)s)",
+    )
+
+    commands.add_parser(
+        "watermark",
         help="Apply a watermark",
-        parents=[mkpdf_parser_generic, compile_parser_generic, watermark_parser_generic])
+        parents=[
+            mkpdf_parser_generic,
+            compile_parser_generic,
+            watermark_parser_generic,
+        ],
+    )
 
     validation_parser_generic = argparse.ArgumentParser(add_help=False)
     validation_parser_generic.add_argument(
-        "--pitstop-url",
-        help="url to call to validate a PDF with pitstop")
+        "--pitstop-url", help="url to call to validate a PDF with pitstop"
+    )
     validation_parser_generic.add_argument(
         "--timeout-pitstop",
         type=float,
-        help="how many seconds to wait for pitstop validation server")
-    validation_parser = commands.add_parser(
-        'pitstop_validate',
+        help="how many seconds to wait for pitstop validation server",
+    )
+
+    commands.add_parser(
+        "pitstop_validate",
         help="Validate a PDF file with Pitstop and Springer direcives",
-        parents=[mkpdf_parser_generic,
-                 compile_parser_generic,
-                 watermark_parser_generic,
-                 validation_parser_generic])
+        parents=[
+            mkpdf_parser_generic,
+            compile_parser_generic,
+            watermark_parser_generic,
+            validation_parser_generic,
+        ],
+    )
 
     pdfa_parser = commands.add_parser(
-        'topdfa',
+        "topdfa",
         help="Generate  PDF/A-1b via Callas' Pdftoolbox",
-        parents=[mkpdf_parser_generic,
-                 compile_parser_generic,
-                 watermark_parser_generic,
-                 validation_parser_generic])
+        parents=[
+            mkpdf_parser_generic,
+            compile_parser_generic,
+            watermark_parser_generic,
+            validation_parser_generic,
+        ],
+    )
     pdfa_parser.add_argument(
         "--pdfa-url",
-        # default="https://medialab.sissa.it/ud/medusa/topdfa",
-        help="url to call to get pdf/a transform")
+        default="https://medialab.sissa.it/ud/medusa/topdfa",
+        help="url to call to get pdf/a transform",
+    )
     pdfa_parser.add_argument(
-        "--timeout-pdfa",
-        type=float,
-        help="how many seconds to wait for PDF/A server")
+        "--timeout-pdfa", type=float, help="how many seconds to wait for PDF/A server"
+    )
     pdfa_parser.add_argument(
         "--do-pitstop-validation",
         action="store_true",
-        help="also request a pitstop validation before PDF/A transformation")
+        help="also request a pitstop validation before PDF/A transformation",
+    )
 
-    # main mandatory option: the file to work with
     parser.add_argument(
-        "archive",
-        help="Archive file to compile or PDF to watermark etc.")
+        "--verify-env",
+        help="Verify environment and exit.",
+        action="store_true",
+    )
 
     args = parser.parse_args()
-    if hasattr(args, 'tex_engine') and args.tex_engine is not None:
+    if not args.verify_env and not args.archive:
+        parser.error("Either verify the enviroment or provide an archive to process.")
+
+    if hasattr(args, "tex_engine") and args.tex_engine is not None:
         args.tex_engine = tex_engine_choices.get(args.tex_engine)
 
     merge_with_config_file(args)
@@ -308,6 +341,12 @@ def main():
 
     # generic logger (by default outputs to console and to a big log file)
     YAKUNIN_LOGGER.setLevel(level=args.log)
+
+    if args.verify_env:
+        for test, result in verify_environment():
+            print(test)
+            print(result)
+        return
 
     with Archive(archive=args.archive) as archive:
         func = getattr(archive, args.command)
@@ -321,8 +360,7 @@ def main():
             # the tex master file could not be found
             TASK_LOGGER.error("Task failed because of missing TeX master file.")
         except Exception as exception:
-            TASK_LOGGER.error('Task failed. Unknown exception "%s".',
-                              exception)
+            TASK_LOGGER.error('Task failed. Unknown exception "%s".', exception)
             if YAKUNIN_LOGGER.getEffectiveLevel() == logging.DEBUG:
                 raise exception
         return result
