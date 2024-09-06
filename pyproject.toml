@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yakunin"
+version = "0.4.1"
+description = "LaTeX compilation script and more"
+readme = "README.rst"
+requires-python = ">=3.7"
+license = { text = "GPLv3+" }
+authors = [
+    { name = "Matteo", email = "gamboz@medialab.sissa.it" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3.7"
+]
+keywords = ["latex", "compilation", "tex-archives"]
+dependencies = [
+    "wheel",
+    "argparse",
+    "filetype",
+    "colorlog",
+    "patool",
+    "requests"
+]
+
+[project.scripts]
+yakunin = "yakunin:main"
+
+[tool.setuptools]
+packages = ["yakunin"]
+data-files = { "etc" = ["yakunin.json"] }
+
+# [tool.flake8] see .flake8
+
+[tool.pycodestyle]
+max-line-length = 119
+
+[tool.pydocstyle]
+add-ignore = ["D203", "D300", "D400"]
+
+[tool.isort]
+profile = "black"

@@ -1,1 +1,7 @@
 *~
+__pycache__
+yakunin.egg-info/**
+build
+dist
+
+DUMMY--SEE-LIB.PY

@@ -14,32 +14,32 @@ and pytest.ini (that disables the running of this specific test by default)
 
 """
 
+import logging
 import os
 import re
-import logging
+
+import pytest
+
 from yakunin.archive import Archive
 from yakunin.lib import aruspica_mime
 
-
-YAKUNIN_LOGGER = logging.getLogger('yakunin')
+YAKUNIN_LOGGER = logging.getLogger("yakunin")
 
 # arXiv number; something like 1705_10950v3
-ARXIV_P = re.compile(r'^[0-9]{4,4}_[0-9]{4,5}(v[0-9])?$')
+ARXIV_P = re.compile(r"^[0-9]{4,4}_[0-9]{4,5}(v[0-9])?$")
 
 
 # @pytest.mark.parametrize('preprint', ['JHEP_001P_0119', ])
-def test_collect_preprint(mount_wjfs,
-                          preprint,
-                          setup_config):
+@pytest.mark.skip
+def test_collect_preprint(mount_wjfs, preprint, setup_config):
     """Try to collect info about a specific preprint.
     Collected info must be added to expected_results.xml
     for subsequent testing."""
-    os.chdir(
-        os.path.join(mount_wjfs, preprint, '1', 'submission'))
+    os.chdir(os.path.join(mount_wjfs, preprint, "1", "submission"))
     filename = aruspica_submitted_archive(os.getcwd())
-    result = Archive(archive=filename).compile(timeout=300)
+    result = Archive(archive=filename).tex_compile(timeout=300)
     print(result)
-    assert False
+    assert 1 == 0
 
 
 def aruspica_submitted_archive(basedir) -> str:
@@ -59,7 +59,10 @@ def aruspica_submitted_archive(basedir) -> str:
     if len(arxivs) == 1:
         archive = arxivs[0]
         # should have mime-type tar/tar.gz
-        # assert aruspica_mime(archive) in ['application/x-compressed-tar', 'application/x-bzip-compressed-tar']
+        assert aruspica_mime(archive) in [
+            "application/x-compressed-tar",
+            "application/x-bzip-compressed-tar",
+        ]
         return archive
 
     if len(arxivs) > 1:
@@ -79,8 +82,8 @@ def aruspica_submitted_archive(basedir) -> str:
     # not an arXiv
     # we might have tar.gz, zip, tex.gz or tex
     # (in order of most probable to less probable)
-    for extension in ['tar.gz', 'zip', 'tex.gz', 'tex']:
-        candidates = list(filter(lambda x: x.endswith("."+extension), files))
+    for extension in ["tar.gz", "zip", "tex.gz", "tex"]:
+        candidates = list(filter(lambda x: x.endswith("." + extension), files))
         if len(candidates) == 1:
             archive = candidates[0]
             return archive
@@ -90,9 +93,22 @@ def aruspica_submitted_archive(basedir) -> str:
 
     # let's try with the mime type
     # keep only files with interesting mime-type
-    candidates = filter(lambda x: aruspica_mime(os.path.join(basedir, x)) in ["application/zip", "application/x-compressed-tar", "application/gzip", "text/x-tex"], files)
+    candidates = filter(
+        lambda x: aruspica_mime(os.path.join(basedir, x))
+        in [
+            "application/zip",
+            "application/x-compressed-tar",
+            "application/gzip",
+            "text/x-tex",
+        ],
+        files,
+    )
     # then order by size and return the biggest (is this a good idea?)
-    candidates = sorted(candidates, key=lambda x: os.stat(os.path.join(basedir, x)).st_size, reverse=True)
+    candidates = sorted(
+        candidates,
+        key=lambda x: os.stat(os.path.join(basedir, x)).st_size,
+        reverse=True,
+    )
     archive = list(candidates)[0]
     return archive
 

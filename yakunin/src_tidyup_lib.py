@@ -12,21 +12,12 @@ yakunin.Archive::read_log durin log analysis.
 """
 
 import logging
-import subprocess
-import re
 import os
+import re
 import shutil
+import subprocess
 
-TASK_LOGGER = logging.getLogger('yakunin.task')
-
-
-# def expose(search_string=None):
-#     'Decorate a function so that it is used by read_log'
-#     def wrapper(func):
-#         func.exposed = True
-#         func.search_string = search_string
-#         return func
-#     return wrapper
+TASK_LOGGER = logging.getLogger("yakunin.task")
 
 
 def n000_fix_encoding(filename):
@@ -47,97 +38,103 @@ def n000_fix_encoding(filename):
 
     This function should be called before any compilation attempt.
     """
-
     charset = None
     result = subprocess.run(
-        args=['file', '-b', '--mime-encoding', filename],
+        args=["file", "-b", "--mime-encoding", filename],
         stdout=subprocess.PIPE,
         check=True,
-        encoding='utf-8')
+        encoding="utf-8",
+    )
 
     charset = result.stdout.strip()
-    if charset not in ['us-ascii', 'utf-8']:
-
-        if charset == 'unknown-8bit':
+    if charset not in ["us-ascii", "utf-8"]:
+        if charset == "unknown-8bit":
             # assunzione...
-            TASK_LOGGER.debug('%s charset is %s; assuming win-1252',
-                              filename, charset)
-            charset = 'cp1252'
+            TASK_LOGGER.debug("%s charset is %s; assuming win-1252", filename, charset)
+            charset = "cp1252"
             # per emacs è win-1252
             # per latex sarebbe \usepackage[ansinew]{inputenc}
 
-        TASK_LOGGER.debug('%s charset is %s',
-                          filename, charset)
+        TASK_LOGGER.debug("%s charset is %s", filename, charset)
         # if the file contains \usepackage[xxx]{inputenc}
         # we do nothing (assuming xxx == charset)
-        inputenc = re.compile(r'^[^%]*\\usepackage\[[^]]+\]{inputenc}')
+        inputenc = re.compile(r"^[^%]*\\usepackage\[[^]]+\]{inputenc}")
         match = None
-        with open(filename, 'r', encoding=charset) as src:
+        with open(filename, encoding=charset) as src:
             for line in src:
                 match = re.match(inputenc, line)
                 if match is not None:
                     break
 
         if match is not None:
-            TASK_LOGGER.debug("%s has %s",
-                              filename, match.group(0))
+            TASK_LOGGER.debug("%s has %s", filename, match.group(0))
 
         else:
             # let's re-code the file
-            original_file = filename+"."+charset
+            original_file = filename + "." + charset
             os.rename(filename, original_file)
-            subprocess.run(args=["iconv", "-f", charset,
-                                 "-t", "utf-8",
-                                 "-o", filename,
-                                 original_file],
-                           check=True)
-            TASK_LOGGER.info("%s recoded from %s to utf-8",
-                             filename, charset)
+            subprocess.run(
+                args=[
+                    "iconv",
+                    "-f",
+                    charset,
+                    "-t",
+                    "utf-8",
+                    "-o",
+                    filename,
+                    original_file,
+                ],
+                check=True,
+            )
+            TASK_LOGGER.info("%s recoded from %s to utf-8", filename, charset)
 
-        #TODO: error management
+        # TODO: error management
 
 
-def n010_remove_U202C(filename):
+def n010_remove_U202C(filename):  # NOQA N802
     """Remove all occurrences of char U202C (‬) POP DIRECTIONAL FORMATTING
-    which is generally not displayed in any way."""
 
-    result = subprocess.run(args=['grep',
-                                  '-q',
-                                  '‬',  # tra gli apici c'è un U202C (\xE2 \x80 \xAC)
-                                  filename],
-                            check=False)
+    which is generally not displayed in any way.
+    """
+    result = subprocess.run(
+        args=[
+            "grep",
+            "-q",
+            "‬",  # tra gli apici c'è un U202C (\xE2 \x80 \xAC)
+            filename,
+        ],
+        check=False,
+    )
     # grep called from bash works also like this:
     # grep $'\xe2\x80\xac' Paper.tex
     # but I think it relies on korn-escapes
 
     if result.returncode == 0:
         # found something
-        TASK_LOGGER.debug("found U202C in %s",
-                          filename)
+        TASK_LOGGER.debug("found U202C in %s", filename)
 
-        backup = filename + '.U202C_bkup'
+        backup = filename + ".U202C_bkup"
         shutil.copy(filename, backup)
 
         try:
-            subprocess.run(args=["sed",
-                                 "-i",
-                                 "s/‬//g",  # il search patter è U202C
-                                 filename],
-                           check=True)
+            subprocess.run(
+                args=["sed", "-i", "s/‬//g", filename],  # il search patter è U202C
+                check=True,
+            )
         except Exception as error:
             TASK_LOGGER.warning(
-                "Could not remove char U202C from %s. Compilation might fail.",
-                filename)
+                "Could not remove char U202C from %s (error: %s). Compilation might fail.",
+                filename,
+                error,
+            )
         else:
             if os.stat(backup).st_size == os.stat(filename).st_size:
                 TASK_LOGGER.error(
-                    "Size of %s before and after U202C removal si the same.",
-                    filename)
+                    "Size of %s before and after U202C removal si the same.", filename
+                )
                 # raise something?
 
-            TASK_LOGGER.info(
-                "Removed all occurrences of U202C from %s.",
-                filename)
+            TASK_LOGGER.info("Removed all occurrences of U202C from %s.", filename)
 
     else:
         # file is clean, nothing to do

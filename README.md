@@ -24,28 +24,11 @@ Anotherd archive for use by the typesetter can also be present.
 # Installation
 
 ```sh
-python3 -m venv v . ./v/bin/activate
-# Optional: pip install wheel
-pip install svn+http://auriol/svn/misc/yakunin-project/with-script#yakunin
+pip install yakunin
 yakunin -h
+yakunin --verify-env
 ```
 
-Once installed, the script can also be called from its installation dir
-(it will find its own python automagically)
-`/path/to/virtual-env/bin/yakunin -h`
-
-# Development environment
-
-```sh
-svn co <http://auriol/svn/misc/yakunin-project/with-script>
-yakunin-project cd yakunin-project
-
-python3 -m venv v . v/bin/activate pip install -U pip
-
-python setup.py install yakunin -h
-
-pip install pytest pytest
-```
 
 # Tests
 
@@ -55,13 +38,17 @@ different approach, see
 
 # Examples
 
-```sh
-# Send a slow-compiling file followed by three fast ones
-export url=http://localhost:8888/compile
-export common="-F <file=@vari>/arch.zip -F engine=lualatex"
+## CLI
 
-curl $common -F master=slow.tex $url & sleep 1
-curl $common -F master=fast.tex $url &
-curl $common -F master=fast.tex $url &
-curl $common -F master=fast.tex $url &
+```sh
+yakunin watermark --text CIAONE -x 10 -y 500 tests/test-files/01-test.tex
+```
+
+## Programmatic
+
+```python
+import yakunin
+archive = yakunin.Archive(archive=file_path)
+archive.watermark(text="Ciaone")
+targz_with_processed_files = archive.submission_archive()
 ```
