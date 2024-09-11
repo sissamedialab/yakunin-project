@@ -1,6 +1,7 @@
 default:
   image: python:3.11
   tags:
+    - dind
     - inasset
 
   cache:
@@ -12,6 +13,7 @@ variables:
   PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
 
 stages:
+  - prepare
   - test
   - build
 
@@ -24,29 +26,63 @@ include:
     file: '.gitlab-ci-pkg-build-and-upload.yml'
 
 
-build-image-for-tests:
+# Build an image with all dependencies needed by yakunin
+build-base-image:
   image: docker:dind
-  stage: test
-  when: manual
+  stage: prepare
+  services:
+    - docker:dind
   variables:
-    TAG: registry.gitlab.sissamedialab.it/wjs/jcomassistant-project/ja-plus:latest
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin-base:latest
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
-    - docker build --tag $TAG .
+    - docker pull $TAG || true
+    - docker build --cache-from $TAG --tag $TAG -f Dockerfile.base .
     - docker push $TAG
+  when: manual
+  # TODO: with the following, the tests are not run!?
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  #   - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+  #     when: manual
+
+# Update/upgrade the base image with latest debian security updates
+build-image:
+  stage: build
+  image: docker:dind
+  services:
+    - docker:dind
+  variables:
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:latest
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker pull $TAG || true
+    - docker build --cache-from $TAG --tag $TAG .
+    - docker push $TAG
+  only:
+    - master
+  # TODO: with the following, the tests are not run!?
+  # rules:
+  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  #   - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+  #     when: manual
 
 
 run-tests:
   except:
     - tags
   stage: test
-  image: registry.gitlab.sissamedialab.it/wjs/jcomassistant-project/ja-plus:latest
+  image: $CI_REGISTRY/wjs/yakunin-project/yakunin-base:latest
 
   script:
-    - pip install --cache $PIP_CACHE_DIR --break-system-packages --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple .
+    - pip install --cache $PIP_CACHE_DIR --break-system-packages --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple .[test,service]
     - pytest -n 16
 
 
 pre-commit:
+  stage: test
   # Always run linting, except for tags
   except:
     - tags
