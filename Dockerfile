@@ -1,13 +1,14 @@
-FROM registry.gitlab.sissamedialab.it/wjs/jcomassistant-project/ja-base:latest
+# To be generated daily for security updates
+FROM registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin-base:latest
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     --mount=type=cache,target=/root/.cache/pip
 
-RUN apt-get update && apt-get install -y unoconv libreoffice
+RUN apt-get update && apt-get upgrade -y
 
-# Run libreoffice initialization and quit
-RUN libreoffice --headless --terminate_after_init
+COPY . /workdir
+WORKDIR /workdir
+RUN pip install --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple --break-system-packages .[service,test]
 
-# keep on separate layer because I'm not sure if always intalling pytest is a good idea:
-RUN apt-get install -y python3-pytest python3-pytest-xdist
+CMD ["yakunin-start"]

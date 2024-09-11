@@ -29,8 +29,23 @@ dependencies = [
     "requests"
 ]
 
+[project.optional-dependencies]
+test = [
+    "numpy",
+    "pillow",
+    "pytest",
+    "pytest-xdist"
+]
+service = [
+    "tornado"
+]
+
 [project.scripts]
 yakunin = "yakunin:main"
+yakunin-start = "yakunin.service:main"
+yakunin-stop = "yakunin.service:stop"
+yakunin-process = "yakunin.service:send"
+
 
 [tool.setuptools]
 packages = ["yakunin"]
@@ -42,7 +57,7 @@ data-files = { "etc" = ["yakunin.json"] }
 max-line-length = 119
 
 [tool.pydocstyle]
-add-ignore = ["D203", "D300", "D400"]
+add-ignore = ["D103", "D203", "D300", "D400"]
 
 [tool.isort]
 profile = "black"
