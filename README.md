@@ -29,6 +29,23 @@ yakunin -h
 yakunin --verify-env
 ```
 
+## Docker
+
+To run the docker image locally
+```sh
+# login (if not already logged-in[*])
+docker login gitlab.sissamedialab.it
+
+# get the image
+docker pull registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:latest
+
+# run a container form the image
+docker run --name yakunin --rm -p 1235:8888 registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:latest
+
+```
+
+[*] See [here](https://docs.gitlab.com/ee/user/packages/container_registry/authenticate_with_container_registry.html) for details.
+
 
 # Tests
 
