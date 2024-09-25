@@ -28,8 +28,8 @@ include:
 
 # Build an image with all dependencies needed by yakunin
 build-base-image:
-  image: docker:dind
   stage: prepare
+  image: docker:dind
   services:
     - docker:dind
   variables:
@@ -40,12 +40,11 @@ build-base-image:
     - docker pull $TAG || true
     - docker build --cache-from $TAG --tag $TAG -f Dockerfile.base .
     - docker push $TAG
-  when: manual
-  # TODO: with the following, the tests are not run!?
-  # rules:
-  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  #   - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
-  #     when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true # (the pipeline continues running even if the manual job is not run)
 
 # Update/upgrade the base image with latest debian security updates
 build-image:
@@ -61,40 +60,45 @@ build-image:
     - docker pull $TAG || true
     - docker build --cache-from $TAG --tag $TAG .
     - docker push $TAG
-  only:
-    - master
-  # TODO: with the following, the tests are not run!?
-  # rules:
-  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  #   - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
-  #     when: manual
+
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: always
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true # (the pipeline continues running even if the manual job is not run)
 
 
 run-tests:
-  except:
-    - tags
   stage: test
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: always
   image: $CI_REGISTRY/wjs/yakunin-project/yakunin-base:latest
-
   script:
     - pip install --cache $PIP_CACHE_DIR --break-system-packages --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple .[test,service]
     - pytest -n 16
 
 
 pre-commit:
-  stage: test
-  # Always run linting, except for tags
-  except:
-    - tags
   extends:
     - .run-pre-commit
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: always
+
 
 
 upload-package:
-  only:
-    - tags
   extends:
     - .upload-package
+  rules:
+    - if: '$CI_COMMIT_TAG'
 
 
 upload-package-manual:
