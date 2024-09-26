@@ -39,12 +39,12 @@ def main() -> None:
     app = make_app()
     app.listen(PORT)
     setup_yakunin()
-    logger.info("Started jcomassistant service")
+    logger.info("Started yakunin service")
     tornado.ioloop.IOLoop.current().start()
 
 
 def stop() -> None:
-    logger.info("Stopping jcomassistant service")
+    logger.info("Stopping yakunin service")
     tornado.ioloop.IOLoop.current().stop()
 
 
