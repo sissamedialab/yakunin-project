@@ -40,7 +40,7 @@ docker login gitlab.sissamedialab.it
 docker pull registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:latest
 
 # run a container form the image
-docker run --name yakunin --rm -p 1235:8888 registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:latest
+docker run --name yakunin --rm -p 1235:8889 registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:latest
 
 ```
 
