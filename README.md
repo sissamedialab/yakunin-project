@@ -69,3 +69,11 @@ archive = yakunin.Archive(archive=file_path)
 archive.watermark(text="Ciaone")
 targz_with_processed_files = archive.submission_archive()
 ```
+
+## Docker
+
+Start a container (see above) and send your file to the appropriate handler:
+
+```sh
+curl -F file=@x.docx http://localhost:1235/mkpdf -o x.tar.gz
+```
