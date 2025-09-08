@@ -60,7 +60,12 @@ KNOWN_FORMATS = [(os.path.join(ARCHIVES_DIR, x[0]), x[1]) for x in KNOWN_FORMATS
 def test_filetype_guessing(archive, mime, setup_config):
     "Verify the guessing of the mime type of certain files"
     found_mime = aruspica_mime(archive)
-    assert found_mime == mime
+    # different systems can give slightly different answers for RAR archives
+    # (e.g. my machine and gitlab-ci 😢)
+    if "x-rar" in mime:
+        assert found_mime in {"application/vnd.rar", "application/x-rar"}
+    else:
+        assert found_mime == mime
 
 
 TEX_MASTERS = [

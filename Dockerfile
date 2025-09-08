@@ -1,14 +1,11 @@
 # To be generated daily for security updates
-FROM registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin-base:latest
+ARG ML_VERSION=trixie-tl25-py313-ml2
+FROM registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:$ML_VERSION
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/root/.cache/pip
+    --mount=type=cache,target=/var/lib/apt,sharing=locked
 
+
+USER root
 RUN apt-get update && apt-get upgrade -y
-
-COPY . /workdir
-WORKDIR /workdir
-RUN pip install --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple --break-system-packages .[service,test]
-
-CMD ["yakunin-start"]
+USER app
