@@ -156,6 +156,7 @@ class Archive:
             "application/gzip": "gz",
             "application/x-bzip2": "bz",
             "application/x-rar": "any",
+            "application/vnd.rar": "any",
             "application/vnd.oasis.opendocument.text": "copy",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "copy",
         }

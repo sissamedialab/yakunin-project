@@ -1,5 +1,14 @@
+spec:
+  inputs:
+    weekly:
+      type: boolean
+      default: false
+      description: "Flag to be defined in schedules so that the low-periodicity jobs can know whether to run."
+
+---
+
 default:
-  image: python:3.11
+  image: python:3.13
   tags:
     - dind
     - inasset
@@ -16,6 +25,13 @@ stages:
   - prepare
   - test
   - build
+  - deploy
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - when: always
 
 include:
   - project: 'wjs/wjs-profile-project'
@@ -30,45 +46,48 @@ include:
 build-base-image:
   stage: prepare
   image: docker:dind
-  tags:
-    - inasset
   services:
     - docker:dind
   variables:
-    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin-base:latest
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:$ML_VERSION
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
     - docker pull $TAG || true
-    - docker build --cache-from $TAG --tag $TAG -f Dockerfile.base .
+    - docker build --cache-from $TAG --tag $TAG --build-arg ML_VERSION=$ML_VERSION -f Dockerfile.base .
     - docker push $TAG
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: ($CI_PIPELINE_SOURCE == "schedule") && ("$[[ inputs.weekly ]]" == "true")
+      when: on_success
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true # (the pipeline continues running even if the manual job is not run)
 
 # Update/upgrade the base image with latest debian security updates
-build-image:
-  stage: build
+apt-update:
+  stage: deploy
   image: docker:dind
   tags:
     - inasset
+    - dind
   services:
     - docker:dind
   variables:
-    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:latest
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:$YAKUNIN_VERSION
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
     - docker pull $TAG || true
-    - docker build --cache-from $TAG --tag $TAG .
+    - docker build --cache-from $TAG --tag $TAG --build-arg=ML_VERSION=$ML_VERSION --file Dockerfile .
     - docker push $TAG
 
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: always
+      when: on_success
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true # (the pipeline continues running even if the manual job is not run)
@@ -83,10 +102,9 @@ run-tests:
       when: never
     - if: $CI_PIPELINE_SOURCE != "schedule"
       when: always
-  image: $CI_REGISTRY/wjs/yakunin-project/yakunin-base:latest
+  image: $CI_REGISTRY/wjs/yakunin-project/yakunin:$ML_VERSION
   script:
-    - pip install --cache $PIP_CACHE_DIR --break-system-packages --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple .[test,service]
-    - pytest -n 16
+    - pytest -v -n 16
 
 
 pre-commit:
