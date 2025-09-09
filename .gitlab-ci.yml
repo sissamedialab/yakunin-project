@@ -141,8 +141,8 @@ tag-image-for-production:
     - inasset
     - dind
   variables:
-    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin::$YAKUNIN_PRODUCTION
-    TAG_PRODUCTION: $CI_REGISTRY/wjs/yakunin-project/yakunin::production
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:$YAKUNIN_PRODUCTION
+    TAG_PRODUCTION: $CI_REGISTRY/wjs/yakunin-project/yakunin:production
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker pull $TAG
