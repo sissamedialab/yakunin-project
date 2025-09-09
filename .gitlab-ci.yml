@@ -129,3 +129,27 @@ upload-package-manual:
   when: manual
   extends:
     - .upload-package
+
+
+# Tag the current image with a name that triggers automatic deploy
+tag-image-for-production:
+  stage: deploy
+  image: docker:dind
+  services:
+    - docker:dind
+  tags:
+    - inasset
+    - dind
+  variables:
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin::$YAKUNIN_PRODUCTION
+    TAG_PRODUCTION: $CI_REGISTRY/wjs/yakunin-project/yakunin::production
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $TAG
+    - docker tag $TAG $TAG_PRODUCTION
+    - docker push $TAG_PRODUCTION
+  rules:
+   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+     when: always
+   - if: $CI_PIPELINE_SOURCE == "schedule"
+     when: always
