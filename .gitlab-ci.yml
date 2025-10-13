@@ -42,9 +42,34 @@ include:
     file: '.gitlab-ci-pkg-build-and-upload.yml'
 
 
-# Build an image with all dependencies needed by yakunin
-build-base-image:
+# Build an image with all dependencies needed by yakunin, but without the code itself
+# This should be used as a base for tests (where we want to install the latest code)
+# and for full-fledged yakunin images (both production-ready or development-related).
+build-requirements-image:
   stage: prepare
+  image: docker:dind
+  services:
+    - docker:dind
+  variables:
+    TAG: $CI_REGISTRY/wjs/yakunin-project/requirements:$ML_VERSION
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker pull $TAG || true
+    - docker build --cache-from $TAG --tag $TAG --build-arg ML_VERSION=$ML_VERSION -f Dockerfile.requirements .
+    - docker push $TAG
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true # (the pipeline continues running even if the manual job is not run)
+    - if: ($CI_PIPELINE_SOURCE == "schedule") && ("$[[ inputs.weekly ]]" == "true")
+      when: on_success
+
+# Build the "main" image: dependencies + code from master
+build-base-image:
+  stage: build
   image: docker:dind
   services:
     - docker:dind
@@ -59,11 +84,25 @@ build-base-image:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: on_success
-    - if: ($CI_PIPELINE_SOURCE == "schedule") && ("$[[ inputs.weekly ]]" == "true")
-      when: on_success
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       when: manual
       allow_failure: true # (the pipeline continues running even if the manual job is not run)
+    - if: ($CI_PIPELINE_SOURCE == "schedule") && ("$[[ inputs.weekly ]]" == "true")
+      when: on_success
+
+build-commit-image:
+  stage: build
+  image: docker:dind
+  services:
+    - docker:dind
+  variables:
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:$CI_COMMIT_SHORT_SHA
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker build --tag $TAG --build-arg ML_VERSION=$ML_VERSION -f Dockerfile.base .
+    - docker push $TAG
+  when: manual
 
 # Update/upgrade the base image with latest debian security updates
 apt-update:
@@ -92,6 +131,29 @@ apt-update:
       when: manual
       allow_failure: true # (the pipeline continues running even if the manual job is not run)
 
+# Tag the current image with a name that triggers automatic deploy
+# TODO: merge with job "apt-update"
+tag-image-for-production:
+  stage: deploy
+  image: docker:dind
+  services:
+    - docker:dind
+  tags:
+    - inasset
+    - dind
+  variables:
+    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:$YAKUNIN_PRODUCTION
+    TAG_PRODUCTION: $CI_REGISTRY/wjs/yakunin-project/yakunin:production
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker pull $TAG
+    - docker tag $TAG $TAG_PRODUCTION
+    - docker push $TAG_PRODUCTION
+  rules:
+   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+     when: always
+   - if: $CI_PIPELINE_SOURCE == "schedule"
+     when: always
 
 run-tests:
   stage: test
@@ -102,8 +164,9 @@ run-tests:
       when: never
     - if: $CI_PIPELINE_SOURCE != "schedule"
       when: always
-  image: $CI_REGISTRY/wjs/yakunin-project/yakunin:$ML_VERSION
+  image: $CI_REGISTRY/wjs/yakunin-project/requirements:$ML_VERSION
   script:
+    - pip install --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple --break-system-packages .[service,test]
     - pytest -v -n 16
 
 
@@ -129,27 +192,3 @@ upload-package-manual:
   when: manual
   extends:
     - .upload-package
-
-
-# Tag the current image with a name that triggers automatic deploy
-tag-image-for-production:
-  stage: deploy
-  image: docker:dind
-  services:
-    - docker:dind
-  tags:
-    - inasset
-    - dind
-  variables:
-    TAG: $CI_REGISTRY/wjs/yakunin-project/yakunin:$YAKUNIN_PRODUCTION
-    TAG_PRODUCTION: $CI_REGISTRY/wjs/yakunin-project/yakunin:production
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker pull $TAG
-    - docker tag $TAG $TAG_PRODUCTION
-    - docker push $TAG_PRODUCTION
-  rules:
-   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
-     when: always
-   - if: $CI_PIPELINE_SOURCE == "schedule"
-     when: always

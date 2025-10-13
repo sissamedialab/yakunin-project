@@ -1,4 +1,5 @@
-"""These functions try to correct known problems in the tex sources.
+"""
+These functions try to correct known problems in the tex sources.
 
 Each function deals with only one type of problem.
 
@@ -17,11 +18,14 @@ import re
 import shutil
 import subprocess
 
-TASK_LOGGER = logging.getLogger("yakunin.task")
+from .lib import TASK_LOGGER_NAME
+
+task_logger = logging.getLogger(TASK_LOGGER_NAME)
 
 
 def n000_fix_encoding(filename):
-    r"""Re-code (if necessary) the given file.
+    r"""
+    Re-code (if necessary) the given file.
 
     The default encoding of tex sources changed in 2018 from raw to
     utf-8 (see
@@ -47,15 +51,15 @@ def n000_fix_encoding(filename):
     )
 
     charset = result.stdout.strip()
-    if charset not in ["us-ascii", "utf-8"]:
+    if charset not in {"us-ascii", "utf-8"}:
         if charset == "unknown-8bit":
             # assunzione...
-            TASK_LOGGER.debug("%s charset is %s; assuming win-1252", filename, charset)
+            task_logger.debug("%s charset is %s; assuming win-1252", filename, charset)
             charset = "cp1252"
             # per emacs è win-1252
             # per latex sarebbe \usepackage[ansinew]{inputenc}
 
-        TASK_LOGGER.debug("%s charset is %s", filename, charset)
+        task_logger.debug("%s charset is %s", filename, charset)
         # if the file contains \usepackage[xxx]{inputenc}
         # we do nothing (assuming xxx == charset)
         inputenc = re.compile(r"^[^%]*\\usepackage\[[^]]+\]{inputenc}")
@@ -67,11 +71,11 @@ def n000_fix_encoding(filename):
                     break
 
         if match is not None:
-            TASK_LOGGER.debug("%s has %s", filename, match.group(0))
+            task_logger.debug("%s has %s", filename, match.group(0))
 
         else:
             # let's re-code the file
-            original_file = filename + "." + charset
+            original_file = filename.with_suffix(f"{filename.suffix}.{charset}")
             os.rename(filename, original_file)
             subprocess.run(
                 args=[
@@ -86,21 +90,22 @@ def n000_fix_encoding(filename):
                 ],
                 check=True,
             )
-            TASK_LOGGER.info("%s recoded from %s to utf-8", filename, charset)
+            task_logger.info("%s recoded from %s to utf-8", filename, charset)
 
         # TODO: error management
 
 
-def n010_remove_U202C(filename):  # NOQA N802
-    """Remove all occurrences of char U202C (‬) POP DIRECTIONAL FORMATTING
+def n010_remove_U202C(filename):  # NOQA: N802
+    """
+    Remove all occurrences of char U202C (‬) POP DIRECTIONAL FORMATTING.
 
     which is generally not displayed in any way.
-    """
+    """  # noqa: PLE2502
     result = subprocess.run(
         args=[
             "grep",
             "-q",
-            "‬",  # tra gli apici c'è un U202C (\xE2 \x80 \xAC)
+            "‬",  # tra gli apici c'è un U202C (\xE2 \x80 \xAC)  # noqa: PLE2502
             filename,
         ],
         check=False,
@@ -111,31 +116,38 @@ def n010_remove_U202C(filename):  # NOQA N802
 
     if result.returncode == 0:
         # found something
-        TASK_LOGGER.debug("found U202C in %s", filename)
+        task_logger.debug("found U202C in %s", filename)
 
         backup = filename + ".U202C_bkup"
         shutil.copy(filename, backup)
 
         try:
             subprocess.run(
-                args=["sed", "-i", "s/‬//g", filename],  # il search patter è U202C
+                args=[
+                    "sed",
+                    "-i",
+                    "s/‬//g",  # il search patter è U202C  # noqa: PLE2502
+                    filename,
+                ],
                 check=True,
             )
-        except Exception as error:
-            TASK_LOGGER.warning(
+            # TODO: refactor me for BLE001
+        except Exception as error:  # noqa: BLE001
+            task_logger.warning(
                 "Could not remove char U202C from %s (error: %s). Compilation might fail.",
                 filename,
                 error,
             )
         else:
             if os.stat(backup).st_size == os.stat(filename).st_size:
-                TASK_LOGGER.error(
-                    "Size of %s before and after U202C removal si the same.", filename
+                task_logger.error(
+                    "Size of %s before and after U202C removal si the same.",
+                    filename,
                 )
                 # raise something?
 
-            TASK_LOGGER.info("Removed all occurrences of U202C from %s.", filename)
+            task_logger.info("Removed all occurrences of U202C from %s.", filename)
 
     else:
         # file is clean, nothing to do
-        TASK_LOGGER.debug("No U202C char in %s", filename)
+        task_logger.debug("No U202C char in %s", filename)

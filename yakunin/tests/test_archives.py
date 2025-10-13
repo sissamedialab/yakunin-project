@@ -1,11 +1,13 @@
-"Test that all archives in test-files get compiled"
+"""Test that all archives in test-files get compiled."""
+
 import os
 
 import pytest
-from conftest import ARCHIVES_DESC, ARCHIVES_DIR
 
 from yakunin.archive import Archive
 from yakunin.lib import aruspica_mime
+
+from .conftest import ARCHIVES_DESC, ARCHIVES_DIR
 
 # TODO: archives with file size = 0 byte
 # TODO: archives with illegal file names
@@ -16,7 +18,8 @@ from yakunin.lib import aruspica_mime
 
 @pytest.mark.parametrize("archive", ARCHIVES_DESC)
 def test_compilation(archive_compilation_tester, archive, setup_config):
-    """Test the compilation of the chosen archives.
+    """
+    Test the compilation of the chosen archives.
 
     Read the file tests/test_files/expected_results.xml and test
     archives accordig to specifications found in the file.
@@ -51,14 +54,14 @@ KNOWN_FORMATS = [
         "22-test.docx",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ),
-    ("30456-Paper.rar", "application/x-rar"),
+    ("30456-Paper.rar", "application/vnd.rar"),
 ]
 KNOWN_FORMATS = [(os.path.join(ARCHIVES_DIR, x[0]), x[1]) for x in KNOWN_FORMATS]
 
 
-@pytest.mark.parametrize("archive,mime", KNOWN_FORMATS)
+@pytest.mark.parametrize(("archive", "mime"), KNOWN_FORMATS)
 def test_filetype_guessing(archive, mime, setup_config):
-    "Verify the guessing of the mime type of certain files"
+    """Verify the guessing of the mime type of certain files."""
     found_mime = aruspica_mime(archive)
     # different systems can give slightly different answers for RAR archives
     # (e.g. my machine and gitlab-ci 😢)
@@ -79,9 +82,9 @@ TEX_MASTERS = [
 TEX_MASTERS = [(os.path.join(ARCHIVES_DIR, x[0]), x[1]) for x in TEX_MASTERS]
 
 
-@pytest.mark.parametrize("archive,master", TEX_MASTERS)
+@pytest.mark.parametrize(("archive", "master"), TEX_MASTERS)
 def test_tex_master_guessing(archive, master):
-    "Verify the guessing of the tex master for certain archives"
+    """Verify the guessing of the tex master for certain archives."""
     with Archive(archive=archive) as arc:
         arc.find_master()
         assert arc.tex_master == master

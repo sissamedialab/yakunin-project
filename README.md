@@ -24,9 +24,15 @@ Anotherd archive for use by the typesetter can also be present.
 # Installation
 
 ```sh
-pip install yakunin
+pip install yakunin[test,service]
 yakunin -h
 yakunin --verify-env
+```
+
+## Run it as a service
+
+```sh
+DJANGO_SETTINGS_MODULE=yakunin_service.settings daphne -p 8889 yakunin_service.asgi:application
 ```
 
 ## Docker

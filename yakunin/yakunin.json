@@ -6,7 +6,7 @@
     },
     "LOGGING": {
         "version": 1,
-        "disable_existing_loggers": true,
+        "disable_existing_loggers": false,
         "formatters": {
             "verbose": {
                 "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
@@ -23,7 +23,7 @@
             },
             "colored": {
                 "class": "colorlog.ColoredFormatter",
-                "format": "%(log_color)s%(levelname)s %(message)s%(reset)s"
+              "format": "%(log_color)s%(levelname)s %(message)s%(reset)s"
             }
         },
         "handlers": {
@@ -37,25 +37,17 @@
                 "class": "logging.FileHandler",
                 "filename": "/tmp/yakunin.log",
                 "formatter": "colored-verbino"
-            },
-            "report": {
-                "level": "DEBUG",
-                "class": "logging.FileHandler",
-                "filename": "DUMMY--SEE-LIB.PY",
-                "formatter": "simple",
-                "delay": true
             }
+        },
+        "root": {
+          "handlers": ["console"],
+          "level": "WARNING"
         },
         "loggers": {
             "yakunin": {
                 "handlers": ["console", "general"],
                 "propagate": false,
                 "level": "DEBUG"
-            },
-            "yakunin.task": {
-                "handlers": ["report"],
-                "level": "DEBUG",
-                "propagate": true
             }
         }
     }

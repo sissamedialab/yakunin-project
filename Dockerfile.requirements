@@ -1,0 +1,22 @@
+# This image has all (system) requirements for yakunin
+# See also CI variables
+ARG ML_VERSION="trixie-tl25-py313-ml2"
+FROM registry.gitlab.sissamedialab.it/calderan/medialab-sty/medialab-sty:$ML_VERSION
+LABEL mantainer="wjs-support@medialab.sissa.it>"
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=cache,target=/root/.cache/pip
+
+RUN apt-get update && \
+    apt-get install -y pdftk imagemagick xpdf libreoffice file && \
+    libreoffice --headless --terminate_after_init && \
+    mkdir /workdir
+
+RUN groupadd -g 1000 app && \
+    useradd --no-log-init --uid 1000 --gid app -m --home-dir /home/app app && \
+    mkdir -p /home/app/.cache/pip && chown -R app:app /home/app/.cache && \
+    chown -R app:app /workdir
+ENV PATH="/home/app/.local/bin:${PATH}"
+USER app
+WORKDIR /workdir

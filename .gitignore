@@ -4,4 +4,6 @@ yakunin.egg-info/**
 build
 dist
 
-DUMMY--SEE-LIB.PY
+
+db.sqlite3
+.aider*
