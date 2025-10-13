@@ -1,73 +1,19 @@
-"Setup & entry point"
+"""Setup & entry point."""
 
 import argparse
-import json
 import logging
-import logging.config
 import os
 import sys
 
 from yakunin.archive import Archive
-from yakunin.exceptions import NoTeXMaster, UnknownArchiveFormat
-from yakunin.lib import TASK_LOGGER, YAKUNIN_LOGGER, verify_environment
+from yakunin.exceptions import NoTeXMasterError, UnknownArchiveFormatError
+from yakunin.lib import TASK_LOGGER_NAME, YAKUNIN_LOGGER, verify_environment
+from yakunin.utils import merge_with_config_file
+
+task_logger = logging.getLogger(TASK_LOGGER_NAME)
 
 
-def merge_with_config_file(args):
-    """Merge config file.
-
-    If we have a config file, load it and merge it with the
-    command-line.  Command line args will override config-file
-    directives (this is also why I don't use defaults in command line
-    args).
-
-    """
-    # This function is called after the command line has been parsed
-    # (this function is also called by the setup_config fixture of pytest)
-
-    # remove all empty (None) values from the command-line args
-    # the remaining args will be used dict to update (override)
-    # the parameters read from the config-file
-    keys = list(vars(args).keys())
-    for key in keys:
-        if getattr(args, key) is None:
-            delattr(args, key)
-
-    if os.path.exists(args.config_file):
-        with open(args.config_file) as config_file_content:
-            config = json.load(config_file_content)
-            # read LOGGING config
-            logging_config = config.get("LOGGING", None)
-            logging.config.dictConfig(logging_config)
-
-            # read GENERAL config
-            general_config = config.get("GENERAL", None)
-            if general_config is not None:
-                # override confi-file with command line
-                general_config.update(vars(args))
-
-                # add (or reset) arguments to arparse's Namespace
-                map_obj = [setattr(args, x[0], x[1]) for x in general_config.items()]
-                # (map is lazy: just retruns a map object,
-                #  no action has yet been done;
-                #  call "list" to "execute")
-                list(map_obj)
-    else:
-        logging.debug("No config file found")
-        # TODO: ensure TASK_LOGGER & YAKUNIN_LOGGER are defined
-
-    # set defaults
-    # TODO: manage defaults to appear on command line
-    defaults = {
-        "log": logging.DEBUG,
-        "pdfa_url": "https://medialab.sissa.it/ud/medusa/topdfa",
-        "pitstop_url": "https://medialab.sissa.it/ud/medusa/pitstop_fix",
-    }
-    for key, value in defaults.items():
-        if not hasattr(args, key):
-            setattr(args, key, value)
-
-
-def main():
+def main():  # noqa: PLR0915
     """Read config, command line and run requested command."""
     # The command-line parser is a bit compicated.
     # compile this tikz code to get a representation:
@@ -83,7 +29,7 @@ def main():
     #     options/.style={draw=black!10,anchor=west,text width=11ex},
     #     info/.style={pos=.5,color=black!20,anchor=north west},
     #     parent/.style={dashed,color=black!20,behind path}
-    #   ]  %% # noqa E800
+    #   ]  %%
     #   \node[parser] (main) at (0,0) {main};
     #   \node[options] (main-options) at (main.east)  {-{}-config, -{}-log};
     #
@@ -187,15 +133,15 @@ def main():
         "--log",
         choices=["ERROR", "WARNING", "INFO", "DEBUG"],
         default="DEBUG",
-        help="set logging level for task-logger (overrides config file)."
-        ' Default: "%(default)s"',
+        help='set logging level for task-logger (overrides config file). Default: "%(default)s"',
     )
 
     commands = parser.add_subparsers(title="Commands", dest="command")
 
     compile_parser_generic = argparse.ArgumentParser(add_help=False)
     compile_parser_generic.add_argument(
-        "--tex-master", help="a file with path relative to the extracted archive"
+        "--tex-master",
+        help="a file with path relative to the extracted archive",
     )
 
     tex_engine_choices = {
@@ -235,7 +181,8 @@ def main():
         help="how many seconds to wait for odt→pdf or docx→pdf transformation",
     )
     mkpdf_parser_generic.add_argument(
-        "--url-doc2pdf", help="url to call for docx→pdf transformation"
+        "--url-doc2pdf",
+        help="url to call for docx→pdf transformation",
     )
 
     commands.add_parser(
@@ -276,7 +223,8 @@ def main():
 
     validation_parser_generic = argparse.ArgumentParser(add_help=False)
     validation_parser_generic.add_argument(
-        "--pitstop-url", help="url to call to validate a PDF with pitstop"
+        "--pitstop-url",
+        help="url to call to validate a PDF with pitstop",
     )
     validation_parser_generic.add_argument(
         "--timeout-pitstop",
@@ -311,7 +259,9 @@ def main():
         help="url to call to get pdf/a transform",
     )
     pdfa_parser.add_argument(
-        "--timeout-pdfa", type=float, help="how many seconds to wait for PDF/A server"
+        "--timeout-pdfa",
+        type=float,
+        help="how many seconds to wait for PDF/A server",
     )
     pdfa_parser.add_argument(
         "--do-pitstop-validation",
@@ -337,7 +287,7 @@ def main():
     # provide the two loggers used by the application
     # task_logger will produce a log file in the returned archive
     # it is intended mainly for wjapp
-    TASK_LOGGER.setLevel(level=args.log)
+    task_logger.setLevel(level=args.log)
 
     # generic logger (by default outputs to console and to a big log file)
     YAKUNIN_LOGGER.setLevel(level=args.log)
@@ -346,7 +296,7 @@ def main():
         for test, result in verify_environment():
             print(test)
             print(result)
-        return
+        return None
 
     with Archive(archive=args.archive) as archive:
         func = getattr(archive, args.command)
@@ -354,15 +304,15 @@ def main():
         result = None
         try:
             result = func(**vars(args))
-        except UnknownArchiveFormat:
-            TASK_LOGGER.error("Task failed due to unpacking problems.")
-        except NoTeXMaster:
+        except UnknownArchiveFormatError:
+            task_logger.exception("Task failed due to unpacking problems.")
+        except NoTeXMasterError:
             # the tex master file could not be found
-            TASK_LOGGER.error("Task failed because of missing TeX master file.")
-        except Exception as exception:
-            TASK_LOGGER.error('Task failed. Unknown exception "%s".', exception)
+            task_logger.exception("Task failed because of missing TeX master file.")
+        except Exception:
+            task_logger.exception("Task failed. Unknown exception.")
             if YAKUNIN_LOGGER.getEffectiveLevel() == logging.DEBUG:
-                raise exception
+                raise
         return result
 
 

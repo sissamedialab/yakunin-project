@@ -259,7 +259,7 @@
 
 
   <!-- pytest tests/test_archives.py::test_compilation[mount_wjfs0-archive22] -->
-  <!-- TODO: Fixme UnknownArchiveFormat. Possibly missing SO dependencies about rar -->
+  <!-- TODO: Fixme UnknownArchiveFormatError. Possibly missing SO dependencies about rar -->
   <!-- <archive> -->
   <!--   <name>30456-Paper.rar</name> -->
   <!--   <expected-lines> -->
@@ -287,7 +287,7 @@
   <!-- compilation timeout must be > 3 sec. -->
     <expected-lines>
       <line>INFO Unpacked 💩submission/30480-Agudov_JSTAT_15.09.19.zip as zip</line>
-      <line>INFO Stochastic model Memristor_Kolya_JSTAT_14.09.2019.tex recoded from cp1252 to utf-8</line>
+      <line>INFO 💩Stochastic model Memristor_Kolya_JSTAT_14.09.2019.tex recoded from cp1252 to utf-8</line>
       <line>INFO Successfully compiled Stochastic model Memristor_Kolya_JSTAT_14.09.2019.tex</line>
     </expected-lines>
   </archive>

@@ -1,4 +1,11 @@
-"Mama loves Mambo"
+"""
+Mama loves Mambo.
+
+This looks like a server that receives POST requests and dumps them on stdout.
+Probably used during development.
+
+My guess is that this code can be dropped 🙂.
+"""
 
 import tornado.httpserver
 import tornado.ioloop
@@ -10,24 +17,21 @@ define("port", default=8888, help="run on the given port", type=int)
 
 
 class MainHandler(tornado.web.RequestHandler):
-    "Main handler - dumps requests"
+    """Main handler - dumps requests."""
 
     def post(self):
-        "POST requests"
+        """POST requests."""
         print(self.request)
         for key, value in self.request.files.items():
             print(f"{key}:")
             for item in value:
                 print(f"    {item['filename']},")
                 print(f"    {item['content_type']}")
-        import pdb
-
-        pdb.set_trace()
         print("ciao")
 
 
 def main():
-    "Hit the road Jack"
+    """Hit the road Jack."""
     tornado.options.parse_command_line()
     application = tornado.web.Application(
         [

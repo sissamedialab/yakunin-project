@@ -1,22 +1,26 @@
-"Test the application of a watermark"
+"""Test the application of a watermark."""
+
 import io
 import os
 from subprocess import check_output
 
 import numpy as np
 import pytest
-from conftest import ARCHIVES_DIR, well_formed
 from PIL import Image
 
 from yakunin.archive import Archive
 
+from .conftest import ARCHIVES_DIR, well_formed
+
 
 def pdfs_equals_p(file_a, file_b):
-    """Compare 2 pdf files pixel-wise
+    """
+    Compare 2 pdf files pixel-wise.
+
     The two files must have the same number of pages;
     each page is transformed into a raster image
-    and the couples are compared"""
-
+    and the couples are compared
+    """
     num_pages = get_num_pages(file_a)
     assert num_pages == get_num_pages(file_b)
 
@@ -30,11 +34,11 @@ def pdfs_equals_p(file_a, file_b):
         # np subtraction does not do saturation
         # (i.e. it can overflow)
         # https://stackoverflow.com/a/45817868/1581629
-        # array_c = np.subtract(array_a, array_b)  # NOQA E800
+        # array_c = np.subtract(array_a, array_b)  # noqa: ERA001
 
         # TODO: review me
         # https://stackoverflow.com/a/8538444/1581629
-        # Image.fromarray(array_c).save("/tmp/aaaa.png")  # NOQA E800
+        # Image.fromarray(array_c).save("/tmp/aaaa.png")  # noqa: ERA001
 
         should_be_zero = np.subtract(array_a, array_b).sum()
 
@@ -46,7 +50,7 @@ def pdfs_equals_p(file_a, file_b):
 
 # pdf-diff3 https://github.com/JoshData/pdf-diff
 def pdftopng(pdffile, pagenumber, width=900):
-    "Rasterizes a page of a PDF."
+    """Rasterizes a page of a PDF."""
     pngbytes = check_output(
         args=[
             "pdftoppm",
@@ -58,7 +62,7 @@ def pdftopng(pdffile, pagenumber, width=900):
             str(width),
             "-png",
             pdffile,
-        ]
+        ],
     )
     img = Image.open(io.BytesIO(pngbytes))
     return img.convert("RGB")
@@ -66,15 +70,14 @@ def pdftopng(pdffile, pagenumber, width=900):
 
 # https://stackoverflow.com/a/47169350/1581629
 def get_num_pages(pdf_path):
-    "Return the number of pages of the given pdf file"
-    output = check_output(["pdfinfo", pdf_path]).decode()
-    pages_line = [line for line in output.splitlines() if "Pages:" in line][0]
-    num_pages = int(pages_line.split(":")[1])
-    return num_pages
+    """Return the number of pages of the given pdf file."""
+    output = check_output(["pdfinfo", pdf_path]).decode()  # noqa: S607
+    pages_line = next(iter([line for line in output.splitlines() if "Pages:" in line]))
+    return int(pages_line.split(":")[1])
 
 
 def test_simple_pdf():
-    "Apply a watermak on a simple pdf"
+    """Apply a watermak on a simple pdf."""
     pdf_file = "14-test.pdf"
     pdf_file_path = os.path.join(ARCHIVES_DIR, pdf_file)
     target_pdf_file = "14-test-wm.pdf"
@@ -103,9 +106,9 @@ KNOWN_POSITIONS = (
 )
 
 
-@pytest.mark.parametrize("target_pdf_file,x,y", KNOWN_POSITIONS)
+@pytest.mark.parametrize(("target_pdf_file", "x", "y"), KNOWN_POSITIONS)
 def test_position(target_pdf_file, x, y):
-    "Give different heights to the wm function"
+    """Give different heights to the wm function."""
     pdf_file = "14-test.pdf"
     pdf_file_path = os.path.join(ARCHIVES_DIR, pdf_file)
 
@@ -123,9 +126,11 @@ def test_position(target_pdf_file, x, y):
 
 
 def test_rotated_pages():
-    """Watermark pdf file with rotated pages;
-    the pdf has been generated from the compilation of an archive"""
+    """
+    Watermark pdf file with rotated pages.
 
+    The pdf has been generated from the compilation of an archive
+    """
     pdf_file = "23-wm-rotated.tar.gz"
     pdf_file_path = os.path.join(ARCHIVES_DIR, pdf_file)
     target_pdf_file = "23-wm-rotated-wm.pdf"

@@ -1,4 +1,0 @@
-pytest
-numpy
-Pillow
-colorlog

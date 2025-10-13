@@ -1,8 +1,8 @@
-"Test the function has_documentclass"
+"""Test the function has_documentclass."""
 # keep in a separate module, because test patterns are messy
 
-import os
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -52,17 +52,21 @@ PATTERNS.extend([(x, False) for x in FAIL_PATTERNS])
 
 @pytest.fixture(params=PATTERNS)
 def prove(request):
-    "genera un file di prova a partire da un pattern"
+    """
+    Genera un file di prova a partire da un pattern.
+
+    Yields:
+      tuple(str, str): file name and results. Unlink the file on teardown.
+
+    """
     pattern, result = request.param
-    name = tempfile.mkstemp()[1]
-    with open(name, "w") as test_file:
-        test_file.write(pattern)
-        test_file.flush()
-        yield (name, result)
-    os.unlink(name)
+    test_file = Path(tempfile.mkstemp()[1])
+    test_file.write_text(pattern, encoding="utf-8")
+    yield (test_file.absolute(), result)
+    test_file.unlink()
 
 
 def test_documentclass(prove):
-    "check if has_documentclass works"
+    """Check if has_documentclass works."""
     name, result = prove
     assert has_documentclass(name) is result

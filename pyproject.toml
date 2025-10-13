@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "yakunin"
 version = "0.4.1"
 description = "LaTeX compilation script and more"
-readme = "README.rst"
+readme = "README.md"
 requires-python = ">=3.7"
-license = { text = "GPLv3+" }
+license =  "GPL-3.0-or-later"
 authors = [
     { name = "Matteo", email = "gamboz@medialab.sissa.it" }
 ]
@@ -16,7 +16,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
     "Topic :: Software Development :: Build Tools",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3.7"
 ]
 keywords = ["latex", "compilation", "tex-archives"]
@@ -26,38 +25,162 @@ dependencies = [
     "filetype",
     "colorlog",
     "patool",
-    "requests"
+    "requests",
 ]
 
 [project.optional-dependencies]
 test = [
+    "filelock",
     "numpy",
     "pillow",
     "pytest",
-    "pytest-xdist"
+    "pytest-django",
+    "pytest-xdist",
 ]
 service = [
-    "tornado"
+    "django",
+    "channels",
+    "daphne",
+    "channels-redis",
 ]
 
 [project.scripts]
 yakunin = "yakunin:main"
-yakunin-start = "yakunin.service:main"
-yakunin-stop = "yakunin.service:stop"
-yakunin-process = "yakunin.service:send"
-
+# yakunin-start = "yakunin_service.manage:main"
+# yakunin-stop = "yakunin.service:stop"
+# yakunin-process = "yakunin.service:send"
 
 [tool.setuptools]
-packages = ["yakunin"]
-data-files = { "etc" = ["yakunin.json"] }
+packages = ["yakunin", "yakunin_service"]
+
+[tool.setuptools.package-data]
+yakunin = ["yakunin.json"]
+
 
 # [tool.flake8] see .flake8
 
-[tool.pycodestyle]
-max-line-length = 119
+[tool.djlint]
+profile="django"
+ignore="H006"
 
-[tool.pydocstyle]
-add-ignore = ["D103", "D203", "D300", "D400"]
+[tool.ruff]
+target-version = "py311"
+line-length = 119
+
+[tool.ruff.format]
+
+[tool.ruff.lint]
+preview = true
+
+select = ["ALL"]
+# A003 is triggered only sometimes!
+ignore = [
+  "ARG001",
+  "ARG002",
+  "ARG003",
+  "ANN001",
+  "ANN002",
+  "ANN003",
+  "COM819",
+  "EM101",
+  "D100",  # missing docstring in public module
+  "D101",  # missing docstring in public class   - 🤔 mixed feelings
+  "D103",  # missing docstring in public function (?)
+  "D104",  # missing docstring in public package
+  "D105",  # missing docstring in magic method
+  "D106",  # Missing docstring in public nested class
+  "D200",
+  "D212","D203",
+  "CPY001",
+  "G004",  # logging statement uses f-string
+  "DOC201",  # "return" is not documented in docstring (too invasive)
+  "ANN201",  # missing return type annotation for private function
+  "ANN202",  # missing return type annotation for public function
+  "ANN204",  # missing return type annotation for special method
+  "ANN401",  # Any disallowed   - 🤔
+  "TD",
+  "FIX",
+  "TID252",
+  "PLC0414",
+  "FBT001",
+  "FBT002",
+  "FBT003",
+  "RUF012",
+  "PLR2004",
+  "T201",
+  "INP001",
+  # auto-drop starts here
+  # "B904",  # Within an `except*` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  # "BLE001",  # Do not catch blind exception: `{name}`
+  # "C901",  # `{name}` is too complex ({complexity} &gt; {max_complexity})
+  # "D102",  # Missing docstring in public method
+  # "D400",  # First line should end with a period
+  # "D415",  # First line should end with a period, question mark, or exclamation point
+  # "DOC402",  # `yield` is not documented in docstring
+  # "DOC501",  # Raised exception `{id}` missing from docstring
+  # "DTZ005",  # `datetime.datetime.now()` called without a `tz` argument
+  "EM102",  # Exception must not use an f-string literal, assign to variable first
+  # "ERA001",  # Found commented-out code
+  # "EXE001",  # Shebang is present but file is not executable
+  # "FURB101",  # `open` and `read` should be replaced by `Path({filename}).{suggestion}`
+  # "FURB103",  # `open` and `write` should be replaced by `Path({filename}).{suggestion}`
+  # "G003",  # Logging statement uses `+`
+  # "ARG003",  # Unused class method argument: `{name}`
+  # "LOG015",  # `{}()` call on root logger
+  # "N818",  # Exception name `{name}` should be named with an Error suffix
+  # "PGH004",  # Use specific rule codes when using `noqa`
+  # "PIE810",  # Call `{attr}` once with a `tuple`
+  "PLC0415",  # `import` should be at the top-level of a file
+  # "PLC2701",  # Private name import `{name}` from external module `{module}`
+  # "PLE2502",  # Contains control characters that can permit obfuscated code
+  #
+  # "PLR0911",  # Too many return statements ({returns} &gt; {max_returns})
+  # "PLR0912",  # Too many branches ({branches} &gt; {max_branches})
+  # "PLR0914",  # Too many local variables ({current_amount}/{max_amount})
+  # "PLR0915",  # Too many statements ({statements} &gt; {max_statements})
+  # "PLR6201",  # Use a set literal when testing for membership
+  # "PLR6301",  # Method `{method_name}` could be a function, class method, or static method
+  # "PLW1514",  # `{function_name}` in text mode without explicit `encoding` argument
+  # "PT006",  # Wrong type passed to first argument of `pytest.mark.parametrize`; expected {expected_string}
+  "PTH102",  # `os.mkdir()` should be replaced by `Path.mkdir()`
+  "PTH104",  # `os.rename()` should be replaced by `Path.rename()`
+  "PTH116",  # `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  "PTH118",  # `os.{module}.join()` should be replaced by `Path` with `/` operator
+  "PTH123",  # `open()` should be replaced by `Path.open()`
+  "PTH207",  # Replace `{function}` with `Path.glob` or `Path.rglob`
+  "PTH208",  # Use `pathlib.Path.iterdir()` instead.
+  # "RET504",  # Unnecessary assignment to `{name}` before `return` statement
+  # "RSE102",  # Unnecessary parentheses on raised exception
+  # "RUF015",  # Prefer `next({iterable})` over single element slice
+  # "S101",  # Use of `assert` detected
+  # "S105",  # Possible hardcoded password assigned to: "{}"
+  # "S108",  # Probable insecure usage of temporary file or directory: "{}"
+  # "S113",  # Probable use of `{module}` call without timeout
+  "S314",  # Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents
+  "S404",  # `subprocess` module is possibly insecure
+  "S405",  # `xml.etree` methods are vulnerable to XML attacks
+  "S603",  # `subprocess` call: check for execution of untrusted input
+  # "S607",  # Starting a process with a partial executable path
+  # "SIM115",  # Use a context manager for opening files
+  # "T100",  # Trace found: `{name}` used
+  # "TRY002",  # Create your own exception
+  "TRY003",  # Avoid specifying long messages outside the exception class
+  # "TRY201",  # Use `raise` without specifying exception name
+  # "TRY400",  # Use `logging.exception` instead of `logging.error`
+]
+
+fixable = ["ALL"]
+unfixable = []
+extend-select = [
+  "I",  # isort
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = [
+  "S101",
+  "PLR0913",  # Too many arguments in function definition
+  "PLR0917",  # Too many positional arguments
+]
 
 [tool.isort]
 profile = "black"

@@ -1,13 +1,13 @@
-"Exception classes for yakunin"
+"""Exception classes for yakunin."""
 
 
-class UnknownArchiveFormat(Exception):
-    "x"
+class UnknownArchiveFormatError(Exception):
+    """The format of the archive is not known."""
 
 
-class NoTeXMaster(Exception):
-    "x"
+class NoTeXMasterError(Exception):
+    """The TeX master file cannot be found."""
 
 
-class PDFGenerationFailure(Exception):
-    "x"
+class PDFGenerationError(Exception):
+    """The PDF file could not be generated."""

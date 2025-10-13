@@ -1,4 +1,6 @@
-"""Test the validation of a file via Pitstop;
+"""
+Test the validation of a file via Pitstop.
+
 I only test the process workflow and behavior.
 """
 
@@ -6,15 +8,16 @@ import copy
 import os
 
 import pytest
-from conftest import ARCHIVES_DIR, well_formed
 
 from yakunin.archive import Archive
-from yakunin.lib import TASK_LOG, aruspica_mime
+from yakunin.lib import TASK_LOGFILE_NAME, aruspica_mime
+
+from .conftest import ARCHIVES_DIR, well_formed
 
 
 @pytest.mark.skip("TODO")
 def test_simple_pdf(setup_config):
-    "Pitstop-validate a simple pdf"
+    """Pitstop-validate a simple pdf."""
     pdf_file = "14-test.pdf"
     pdf_file_path = os.path.join(ARCHIVES_DIR, pdf_file)
     archive = Archive(archive=pdf_file_path)
@@ -23,14 +26,12 @@ def test_simple_pdf(setup_config):
     result = archive.submission_archive()
     with well_formed(result) as (tmp_dir, files):
         assert archive.main_pdf in files
-        assert (
-            aruspica_mime(os.path.join(tmp_dir, archive.main_pdf)) == "application/pdf"
-        )
+        assert aruspica_mime(os.path.join(tmp_dir, archive.main_pdf)) == "application/pdf"
 
 
 @pytest.mark.skip("TODO")
 def test_wrong_server(setup_config):
-    "Send for pitstop validation to wrong server (server return 200)"
+    """Send for pitstop validation to wrong server (server return 200)."""
     pdf_file = "14-test.pdf"
     pdf_file_path = os.path.join(ARCHIVES_DIR, pdf_file)
     archive = Archive(archive=pdf_file_path)
@@ -41,7 +42,7 @@ def test_wrong_server(setup_config):
     result = archive.submission_archive()
     with well_formed(result) as (tmp_dir, files):
         assert archive.main_pdf not in files
-        with open(os.path.join(tmp_dir, TASK_LOG)) as src:
+        with open(os.path.join(tmp_dir, TASK_LOGFILE_NAME), encoding="utf-8") as src:
             log_lines = src.readlines()
             expected_text = "ERROR Pitstop validation failed."
             f" Server {setup_config.pitstop_url} returned a text/html file.\n"
@@ -50,7 +51,7 @@ def test_wrong_server(setup_config):
 
 @pytest.mark.skip("TODO")
 def test_non_200(setup_config):
-    "Send for pitstop validation to wrong page (get non-200 code)"
+    """Send for pitstop validation to wrong page (get non-200 code)."""
     # TODO: generalize with previous tests
     pdf_file = "14-test.pdf"
     pdf_file_path = os.path.join(ARCHIVES_DIR, pdf_file)
@@ -62,7 +63,7 @@ def test_non_200(setup_config):
     result = archive.submission_archive()
     with well_formed(result) as (tmp_dir, files):
         assert archive.main_pdf not in files
-        with open(os.path.join(tmp_dir, TASK_LOG)) as src:
+        with open(os.path.join(tmp_dir, TASK_LOGFILE_NAME), encoding="utf-8") as src:
             log_lines = src.readlines()
             expected_text = f"ERROR Pitstop validation failed. Server {setup_config.pitstop_url} returned code 404.\n"
             assert expected_text in log_lines

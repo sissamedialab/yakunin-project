@@ -1,14 +1,15 @@
-"Test log-reading/error-reporting functions"
-
+"""Test log-reading/error-reporting functions."""
 
 import io
 import logging
+from pathlib import Path
 
 import pytest
 
-import yakunin.log_reading_lib as lr
+from yakunin import log_reading_lib
+from yakunin.lib import TASK_LOGFILE_NAME, TASK_LOGGER_NAME, get_task_logger
 
-TASK_LOGGER = logging.getLogger("yakunin.task")
+task_logger = logging.getLogger(TASK_LOGGER_NAME)
 
 # Here is a list of triplets:
 # function name  ---   tex log text  ---   expected output (in task log)
@@ -59,7 +60,6 @@ l.86 \maketitle
 """,
         None,
     ),
-    #
     (
         "max_runs",
         r"""   Changed files, or newly in use since previous run(s):
@@ -155,8 +155,11 @@ Try typing  <return>  to proceed.
 
 
 def make_fake_tex_log(src):
-    """Setup and return a file-like object containing the given "src" text.
-    This "file" will mimick the tex log/stdout"""
+    """
+    Prepare and return a file-like object containing the given "src" text.
+
+    This "file" will mimick the tex log/stdout
+    """
     fake_tex_log = io.StringIO()
     fake_tex_log.write(src)
     fake_tex_log.flush()
@@ -166,44 +169,34 @@ def make_fake_tex_log(src):
 
 # doesn not work in mark.parametrize
 # (pytest's test collection complains about stringIo not having len)
-# UCS_LINES = [make_fake_tex_log(x[0]) for x in UCS_LINES]  # NOQA E800
+# UCS_LINES = [make_fake_tex_log(x[0]) for x in UCS_LINES]  # noqa: ERA001
 
 
-# do not make a fixture, or the same stream will be used for all the tests
-# i.e. scope=function is still too broad
-# @pytest.fixture ← NO!
-def redirect_task_logger_stream():
-    """ "Redirect" the logging output to an in-memory file-like object
-    this will be used to check whether the log-reading function
-    correctly logged the expected problem"""
-    new_stream = io.StringIO()
-    for handler in TASK_LOGGER.handlers:
-        handler.setStream(new_stream)
-    return new_stream
+@pytest.mark.parametrize(("func_name", "tex_log_text", "expected"), UCS_LINES)
+def test_log_reading_functions(
+    func_name,
+    tex_log_text,
+    expected,
+    setup_config,
+    tmp_path: Path,
+):
+    """
+    Call the log-reading function on a fake tex Log.
 
-
-@pytest.mark.parametrize("func_name,tex_log_text,expected", UCS_LINES)
-def test_log_reading_functions(func_name, tex_log_text, expected, setup_config):
-    """Call the log-reading function on a fake tex log and check that the
-    function emits the expected message"""
-
-    tex_log = make_fake_tex_log(tex_log_text)
-
-    # "redirect" task logger to a stream I can read
-    task_logger_stream = redirect_task_logger_stream()
+    Check that the function emits the expected message
+    """
+    # Ensure that the task logger writes to a file in our temp path:
+    get_task_logger(tmp_path)
 
     # read the fake log line by line and call the function if the
     # error line has been found
-    func = getattr(lr, func_name)
+    tex_log = make_fake_tex_log(tex_log_text)
+    func = getattr(log_reading_lib, func_name)
+    print(f"{func=}")
     for line in tex_log:
         if line.find(func.search_string) > -1:
             func(line, tex_log)
 
-    # check if the function emitted the expected output
-    task_logger_stream.flush()
-    task_logger_stream.seek(0)
-    log_lines = list(task_logger_stream.readlines())
+    log_lines = (tmp_path / TASK_LOGFILE_NAME).read_text()
     if expected is not None:
         assert expected in log_lines
-    else:
-        assert expected not in log_lines
