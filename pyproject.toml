@@ -26,6 +26,7 @@ dependencies = [
     "colorlog",
     "patool",
     "requests",
+    "websockets",
 ]
 
 [project.optional-dependencies]
