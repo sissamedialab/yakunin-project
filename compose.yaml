@@ -21,5 +21,6 @@ services:
       - "1235:8889"
     environment:
       REDIS_HOST: redis
+      DEBUG: "True"
     depends_on:
       - "redis"

@@ -1,0 +1,61 @@
+services:
+  redis:
+    image: "redis:alpine"
+    pull_policy: weekly
+
+  yakunin:
+    build:
+      dockerfile: Dockerfile.base
+      # TODO: allow for cache
+      # cache_to:
+      #   - type=local,dest=/tmp/cache
+    # cache_from:
+    #   - type=local,src=/tmp/cache
+
+    # NB: to avoid building locally, one can
+    # - use the pipeline to run the job "build-commit-image"
+    # - uncomment the following line, setting the correct commit (short) SHA
+    # image: registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:5b01d9b
+    ports:
+      - "1235:8889"
+    environment:
+      REDIS_HOST: redis
+      DEBUG: "True"
+    depends_on:
+      - "redis"
+    volumes:
+      - .:/workdir:ro
+    command:
+      - "daphne"
+      - "-b"
+      - "0.0.0.0"
+      - "-p"
+      - "8889"
+      - "yakunin_service.asgi:application"
+
+    # In order to be able to connect to a local WJS,
+    # it's useless to share the host's /etc/hosts
+    # because it probably contains something like
+    # 127.0.0.1 jcom
+    # but that `127.0.0.1` points to the correct localhost
+    # only for the host. I.e. the following is useless:
+    #
+    # volumes:
+    #   - /etc/hosts:/etc/hosts:ro
+    #
+    # Some suggest to use the name `host.docker.internal`
+    # but it does not seem to exist if the host is a Linux box.
+    #
+    # This is a dirty workaround, because the IP depends on the Docker network configuration:
+    extra_hosts:
+      - "jcom.localdomain.net:${HOST_IP:-172.17.0.1}"
+      - "jcom:${HOST_IP:-172.17.0.1}"
+      - "jcom.local:${HOST_IP:-172.17.0.1}"
+      - "jquant.local:${HOST_IP:-172.17.0.1}"
+
+  # Usefult for network debugging: get an image with inetutils:
+  # busybox:
+  #   image: busybox
+  #   command: sleep infinity
+  #   extra_hosts:
+  #     - "myhost:${HOST_IP:-172.17.0.1}"

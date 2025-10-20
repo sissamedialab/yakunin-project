@@ -71,25 +71,27 @@ def yakunin_service(tmp_path_factory, worker_id):
 
 
 @pytest.mark.parametrize(
-    "url",
+    "websocket_name",
     [
         # without feedback channel (situation around summer 2025)
-        f"http://localhost:{PORT}/mkpdf/",
+        "",
         # with feedback channel
-        f"http://localhost:{PORT}/mkpdf/test_ws_name/",
+        "test_ws_name",
     ],
 )
 def test_send_pdf(
     yakunin_service: Callable,
     tmp_path: Path,
-    url: str,
+    websocket_name: str,
 ):
     """Send a tex and get back a PDF."""
+    url = f"http://localhost:{PORT}/mkpdf/"
     in_fname = Path(ARCHIVES_DIR) / "01-test.tex"
     with in_fname.open(mode="rb") as in_fhandle:
         response = requests.post(
             url,
             files={"file": in_fhandle},
+            data={"feedback_ws_url": websocket_name},
             timeout=11,
         )
     assert response.status_code == 200
