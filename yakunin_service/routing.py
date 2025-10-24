@@ -1,8 +1,6 @@
-from django.urls import re_path
+"""Websocket routing."""
 
-from . import consumers
+# Currently just a stub,
+# see https://gitlab.sissamedialab.it/wjs/specs/-/issues/2077
 
-websocket_urlpatterns = [
-    re_path(r"ws/echo/$", consumers.EchoConsumer.as_asgi()),
-    re_path(r"ws/feedback/(?P<feedback_wsname>[a-zA-Z0-9._%-]+)/$", consumers.FeedbackConsumer.as_asgi()),
-]
+websocket_urlpatterns = []
