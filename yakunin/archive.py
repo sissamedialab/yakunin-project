@@ -8,6 +8,7 @@ import os
 import pathlib
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import zipfile
@@ -18,7 +19,11 @@ import requests
 
 import yakunin.log_reading_lib
 import yakunin.src_tidyup_lib
-from yakunin.exceptions import NoTeXMasterError, PDFGenerationError, UnknownArchiveFormatError
+from yakunin.exceptions import (
+    NoTeXMasterError,
+    PDFGenerationError,
+    UnknownArchiveFormatError,
+)
 from yakunin.lib import (
     TASK_LOGGER_NAME,
     YAKUNIN_LOGGER,
@@ -1021,16 +1026,15 @@ showpage
 
         If all goes well, self.main_pdf will be set.
         """
+        # Apparently libreoffice cannot be called concurrently
+        # (see e.g. https://ask.libreoffice.org/t/convert-to-commands-in-parallel-possible/90182)
+        # A workaround, is to set differet UserInstallation folders for each operation,
+        # so we do that:
+        uniq_profile_dir = tempfile.mkdtemp()
         try:
-            # Apparently libreoffice cannot be called concurrently
-            # (see e.g. https://ask.libreoffice.org/t/convert-to-commands-in-parallel-possible/90182)
-            # A workaround, is to set differet UserInstallation folders for each operation,
-            # so we do that:
-            uniq_profile_dir = tempfile.mkdtemp()
-
-            # convert odt to pdf
-            # and save the result in root dir (temp_dir)
-            subprocess.run(
+            # Kudos to Alexandra Zaharia for the spiegone on how to kill process groups:
+            # https://alexandra-zaharia.github.io/posts/kill-subprocess-and-its-children-on-timeout-python/
+            process = subprocess.Popen(
                 args=[
                     "libreoffice",
                     f"-env:UserInstallation=file://{uniq_profile_dir}",
@@ -1039,21 +1043,26 @@ showpage
                     "pdf",
                     "--outdir",
                     self.temp_dir,
-                    file,
+                    str(file),
                 ],
-                check=True,
-                timeout=timeout,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
             )
-        except subprocess.CalledProcessError as error:
-            task_logger.error("PDF generation failed: %s", error)  # noqa: TRY400
-            task_logger.error(f"    error returncode: {error.returncode}")  # noqa: TRY400
-            if error.stderr:
-                task_logger.error(f"    STDERR: {error.stderr}")  # noqa: TRY400
-            if error.stdout:
-                task_logger.error(f"    STDOUT: {error.stdout}")  # noqa: TRY400
+
+            stdout, stderr = process.communicate(timeout=timeout)
+
+            if process.returncode != 0:
+                task_logger.error("PDF generation failed:")
+                task_logger.error(f"    error returncode: {process.returncode}")
+                if stderr:
+                    task_logger.error(f"    STDERR: {stderr.decode()}")
+                if stdout:
+                    task_logger.error(f"    STDOUT: {stdout.decode()}")
+
         except subprocess.TimeoutExpired:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            process.wait()
             task_logger.error("PDF generation timed out after %s seconds", timeout)  # noqa: TRY400
         else:
             task_logger.info("PDF successfully generated.")
