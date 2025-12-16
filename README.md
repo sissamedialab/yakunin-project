@@ -89,12 +89,20 @@ curl -F file=@x.docx http://localhost:1235/mkpdf -o x.tar.gz
 ### How to use
 
 - for local usage / development use `compose.dev.yaml` file for docker compose commands
+- create `.env` file with the following content: `HOST_IP=172.17.0.1` (or whatever your docker host IP is, verify with
+  `docker inspect bridge` and use the value from IPAM -> Config -> Gateway)
 - `docker compose -f compose.dev.yaml build`
 - `docker compose -f compose.dev.yaml up`
 - (from another terminal) `curl http://localhost:1235/test/`
 - start listening on the websocket that will be used for feedback
     - (e.g. using `websocat` from the CLI) `websocat wss://jcom.localdomain.net/ws/feedback/abc-123/`
     - see also firefox extension [WebSocket Weasel](https://github.com/mhgolkar/Weasel)
-- `curl -F file=@/tmp/aaa.docx -F feedback_ws_url=wss://jcom.localdomain.net/ws/feedback/abc-123/ http://localhost:1235/mkpdf/ws/ -o /dev/null`
-    - where `abc-123` is the name of a websocket that will report feedback while the `mkpdf` conversion is running
+- run
+  ```shell
+  curl -F file=@/tmp/aaa.docx -F feedback_ws_url=wss://jcom.localdomain.net/ws/feedback/abc-123/ http://localhost:1235/mkpdf/ws/ -o /dev/null
+  ```
+  where:
+    - `abc-123` is the name of a websocket that will report feedback while the `mkpdf` conversion is running
     - and `feedback_ws_url` must point to a WJS site (e.g. `ws://jcom:8000/ws/feedback/abc-123/`)
+- to run in conjunction with wjs-submission you must run `qcluster` command and set `sync=False` in `Q_CLUSTER` in
+  `settings.py`
