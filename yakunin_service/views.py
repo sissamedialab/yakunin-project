@@ -158,45 +158,49 @@ def mkpdf(request: HttpRequest) -> HttpResponse:
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def watermark(request: HttpRequest, feedback_ws_url: str | None = None) -> HttpResponse:
+def watermark(request: HttpRequest) -> HttpResponse:
     """
     Generate PDF from any given file and watermark it.
 
     Honor wjs.ini.
     """
+    feedback_ws_url = request.POST.get("feedback_ws_url", None)
     with WSLogger(feedback_ws_url=feedback_ws_url) as ws_logger:
         if settings.DEBUG:
-            ws_logger.started("🎌 Watermark application started...")
+            ws_logger.started("🎌 PDF generation started...")
         else:
-            ws_logger.started("Watermark application started...")
+            ws_logger.started("PDF generation started...")
+        try:
+            archive_path, temp_dir = get_main_file(request)
+            ws_logger.running(f"Working on {archive_path}")
+            options = ini_to_kwargs(request)
+            ws_logger.debug(f"Options: {options}")
 
-        archive_path, temp_dir = get_main_file(request)
-        ws_logger.running(f"working on {archive_path}")
-        options = ini_to_kwargs(request)
-        ws_logger.debug(f"options: {options}")
+            archive = yakunin.Archive(archive=archive_path)
+            archive.watermark(**options)
+            output_archive_path = Path(archive.submission_archive())
+            ws_logger.running("watermark applied")
 
-        archive = yakunin.Archive(archive=archive_path)
-        archive.watermark(**options)
-        output_archive_path = Path(archive.submission_archive())
-        ws_logger.completed("watermark applied")
+            with output_archive_path.open(mode="rb") as f:
+                file_data = f.read()
 
-        with output_archive_path.open(mode="rb") as f:
-            file_data = f.read()
+            response = HttpResponse(file_data, content_type="application/gzip")
+            response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
 
-        response = HttpResponse(file_data, content_type="application/gzip")
-        response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
+            logger.info(
+                f"Sending back {output_archive_path.name} as per request. "
+                f"Cleaning {temp_dir} and {output_archive_path}",
+            )
+            shutil.rmtree(temp_dir)
+            Path(output_archive_path).unlink()
+            ws_logger.completed("Sending back response.", file_data)
+        except Exception as e:
+            ws_logger.error(str(e))  # noqa: TRY400
+            logger.exception(
+                "Raised exception during conversion",
+            )
+            response = HttpResponse(str(e), status=500)
 
-        logger.info(
-            f"Sent back {output_archive_path.name} as per request. Cleaning {temp_dir} and {output_archive_path}",
-        )
-        shutil.rmtree(temp_dir)
-        Path(output_archive_path).unlink()
-
-        if settings.DEBUG:
-            ws_logger.completed("🏁 Watermark application complete.")
-        else:
-            ws_logger.completed("Watermark application complete.")
-        ws_logger.completed("Sending back response.", file_data)
     return response
 
 
