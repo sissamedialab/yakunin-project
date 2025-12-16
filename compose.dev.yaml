@@ -16,6 +16,8 @@ services:
     # - use the pipeline to run the job "build-commit-image"
     # - uncomment the following line, setting the correct commit (short) SHA
     # image: registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:5b01d9b
+    env_file:
+      - .env
     ports:
       - "1235:8889"
     # specs#2077 # environment:
