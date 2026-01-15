@@ -3,7 +3,7 @@ __pycache__
 yakunin.egg-info/**
 build
 dist
-
+scratch
 
 db.sqlite3
 .aider*

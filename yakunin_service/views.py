@@ -15,7 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from websockets.sync.client import ClientConnection, connect
 
-import yakunin
+from yakunin.archive import Archive
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class WSLogger:
             try:
                 if self.feedback_ws_url.startswith("wss://") and settings.DEBUG:
                     # Allow for self-signed certificates during development:
-                    ssl_context = ssl.SSLContext()
+                    ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_SERVER)
                     ssl_context.check_hostname = False
                     ssl_context.verify_mode = ssl.CERT_NONE
                     self.feedback_ws = connect(self.feedback_ws_url, ssl=ssl_context)
@@ -128,7 +128,7 @@ def mkpdf(request: HttpRequest) -> HttpResponse:
             ws_logger.running(f"Working on {archive_path}")
             options = ini_to_kwargs(request)
             ws_logger.debug(f"Options: {options}")
-            archive = yakunin.Archive(archive=archive_path)
+            archive = Archive(archive=archive_path)
             archive.mkpdf(**options)
             output_archive_path = Path(archive.submission_archive())
             ws_logger.running("mkpdf completed")
@@ -176,7 +176,7 @@ def watermark(request: HttpRequest) -> HttpResponse:
             options = ini_to_kwargs(request)
             ws_logger.debug(f"Options: {options}")
 
-            archive = yakunin.Archive(archive=archive_path)
+            archive = Archive(archive=archive_path)
             archive.watermark(**options)
             output_archive_path = Path(archive.submission_archive())
             ws_logger.running("watermark applied")

@@ -1,15 +1,12 @@
 """Test log-reading/error-reporting functions."""
 
 import io
-import logging
 from pathlib import Path
 
 import pytest
 
 from yakunin import log_reading_lib
-from yakunin.lib import TASK_LOGFILE_NAME, TASK_LOGGER_NAME, get_task_logger
-
-task_logger = logging.getLogger(TASK_LOGGER_NAME)
+from yakunin.utils import TaskLogger
 
 # Here is a list of triplets:
 # function name  ---   tex log text  ---   expected output (in task log)
@@ -186,7 +183,7 @@ def test_log_reading_functions(
     Check that the function emits the expected message
     """
     # Ensure that the task logger writes to a file in our temp path:
-    get_task_logger(tmp_path)
+    task_logger = TaskLogger(tmp_path)
 
     # read the fake log line by line and call the function if the
     # error line has been found
@@ -195,8 +192,8 @@ def test_log_reading_functions(
     print(f"{func=}")
     for line in tex_log:
         if line.find(func.search_string) > -1:
-            func(line, tex_log)
+            func(line, tex_log, task_logger)
 
-    log_lines = (tmp_path / TASK_LOGFILE_NAME).read_text()
+    log_lines = task_logger.log_file.read_text()
     if expected is not None:
         assert expected in log_lines

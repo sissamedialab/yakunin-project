@@ -6,7 +6,7 @@ import re
 import pytest
 
 from yakunin.archive import Archive
-from yakunin.lib import TASK_LOGFILE_NAME
+from yakunin.utils import TASK_LOGFILE_NAME
 
 from .conftest import ARCHIVES_DIR, well_formed
 
