@@ -26,7 +26,7 @@ import re
 import pytest
 
 from yakunin.archive import Archive
-from yakunin.lib import aruspica_mime
+from yakunin.utils import aruspica_mime
 
 YAKUNIN_LOGGER = logging.getLogger("yakunin")
 

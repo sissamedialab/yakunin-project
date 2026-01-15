@@ -31,7 +31,7 @@ services:
       # For DEBUG to take effect, it must agree with
       # yakunin_service/settings.py
       # (i.e. it must have the string value "True")
-      # Yaml gotcha: do not use play True (withoud quotes)!
+      # Yaml gotcha: do not use play True (without quotes)!
       DEBUG: "True"
     command:
       - "daphne"

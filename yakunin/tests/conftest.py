@@ -15,8 +15,7 @@ from pathlib import Path
 import pytest
 
 from yakunin.archive import Archive
-from yakunin.lib import TASK_LOGFILE_NAME
-from yakunin.utils import merge_with_config_file
+from yakunin.utils import TASK_LOGFILE_NAME, merge_with_config_file
 
 # Build a list of files (archives) to test
 

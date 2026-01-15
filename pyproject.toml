@@ -46,7 +46,7 @@ service = [
 ]
 
 [project.scripts]
-yakunin = "yakunin:main"
+yakunin = "yakunin.main:main"
 # yakunin-start = "yakunin_service.manage:main"
 # yakunin-stop = "yakunin.service:stop"
 # yakunin-process = "yakunin.service:send"

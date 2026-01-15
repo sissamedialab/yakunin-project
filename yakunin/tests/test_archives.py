@@ -5,7 +5,7 @@ import os
 import pytest
 
 from yakunin.archive import Archive
-from yakunin.lib import aruspica_mime
+from yakunin.utils import aruspica_mime
 
 from .conftest import ARCHIVES_DESC, ARCHIVES_DIR
 
@@ -87,4 +87,4 @@ def test_tex_master_guessing(archive, master):
     """Verify the guessing of the tex master for certain archives."""
     with Archive(archive=archive) as arc:
         arc.find_master()
-        assert arc.tex_master == master
+        assert arc.tex_master.name == master

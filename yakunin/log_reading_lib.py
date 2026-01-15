@@ -19,12 +19,8 @@ Each function in this module will be "called" by
 yakunin.Archive::read_log durin log analysis.
 """
 
-import logging
 import re
 
-from .lib import TASK_LOGGER_NAME
-
-task_logger = logging.getLogger(TASK_LOGGER_NAME)
 LINE_NUMBER_P = re.compile(r"^l\.([0-9]+) ")
 UNICODE_CHAR_P = re.compile(r"\((U\+[A-F0-9]{4,4})\)")
 FILE_NOT_FOUND_P = re.compile(r"^! LaTeX Error: File `([^']+)' not found.")
@@ -34,6 +30,7 @@ def report_error_and_line(
     file_handle,
     text_for_the_warning,
     text_for_reporting_issues_while_reading_log,
+    task_logger,
     faq=None,
 ):
     """
@@ -99,9 +96,8 @@ def expose(search_string=None):
 
 
 @expose(search_string="Undefined control sequence")
-def undefined_control_sequence(line, file_handle):
+def undefined_control_sequence(line, file_handle, task_logger):
     """How to read and what to do upon "Undefined control sequence" errors."""
-    task_logger = logging.getLogger("yakunin.task")
     task_logger.debug('Function "%s" called on "%s"', __name__, line.strip())
 
     next_line = file_handle.readline()
@@ -112,13 +108,13 @@ def undefined_control_sequence(line, file_handle):
 @expose(
     search_string="Latexmk: Maximum runs of pdflatex reached without getting stable files",
 )
-def max_runs(line, file_handle):
+def max_runs(line, file_handle, task_logger):
     """Look for latexmk's maximum-runs error."""
     task_logger.warning(line.strip())
 
 
 @expose(search_string=r"! LaTeX Error: Command \bfseries invalid in math mode.")
-def bf_in_math_mode(line, file_handle):
+def bf_in_math_mode(line, file_handle, task_logger):
     r"""! LaTeX Error: Command \bfseries invalid in math mode."""
     # ! LaTeX Error: Command \bfseries invalid in math mode.
     #
@@ -134,12 +130,13 @@ def bf_in_math_mode(line, file_handle):
         file_handle,
         r'Probably a "\cite" inside mathematics.',
         "Could not understand boldface-in-math-mode error.",
+        task_logger,
         faq="Please see FAQ-123.",
     )
 
 
 @expose(search_string="! Package inputenc Error: Unicode character")
-def inputenc_unicode_not_setup(line, file_handle):
+def inputenc_unicode_not_setup(line, file_handle, task_logger):
     """! Package inputenc Error: Unicode character ¦ (U+00A6)."""
     # ! Package inputenc Error: Unicode character ¦ (U+00A6)
     # (inputenc)                not set up for use with LaTeX.
@@ -165,13 +162,14 @@ def inputenc_unicode_not_setup(line, file_handle):
         file_handle,
         text_for_the_warning,
         text_for_reporting_issues_while_reading_log,
+        task_logger,
         faq=faq,
     )
 
 
 # TODO: use search_regexp?
 @expose(search_string="! LaTeX Error: File ")
-def file_not_found(line, file_handle):
+def file_not_found(line, file_handle, task_logger):
     """! LaTeX Error: File `FDiagnis3' not found."""
     # ! LaTeX Error: File `FDiagnis3' not found.
 
@@ -192,13 +190,14 @@ def file_not_found(line, file_handle):
         file_handle,
         f'You probably forgot to include "{missing_file}" in the submitted archive.',
         "Could not understand file-not-found error.",
+        task_logger,
         faq="Please see FAQ-123.",
     )
 
 
 # TODO: use search_regexp?
 @expose(search_string="Package biblatex Warning: File ")
-def bbl_wrong_version(line, file_handle):
+def bbl_wrong_version(line, file_handle, task_logger):
     """Package biblatex Warning: File xxx is wrong format version."""
     if "is wrong format version" in line:
         task_logger.warning(

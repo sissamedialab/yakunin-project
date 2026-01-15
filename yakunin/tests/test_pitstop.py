@@ -10,7 +10,7 @@ import os
 import pytest
 
 from yakunin.archive import Archive
-from yakunin.lib import TASK_LOGFILE_NAME, aruspica_mime
+from yakunin.utils import TASK_LOGFILE_NAME, aruspica_mime
 
 from .conftest import ARCHIVES_DIR, well_formed
 

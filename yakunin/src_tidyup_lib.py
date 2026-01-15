@@ -12,18 +12,13 @@ Each function in this module will be "called" by
 yakunin.Archive::read_log durin log analysis.
 """
 
-import logging
 import os
 import re
 import shutil
 import subprocess
 
-from .lib import TASK_LOGGER_NAME
 
-task_logger = logging.getLogger(TASK_LOGGER_NAME)
-
-
-def n000_fix_encoding(filename):
+def n000_fix_encoding(filename, task_logger):
     r"""
     Re-code (if necessary) the given file.
 
@@ -95,7 +90,7 @@ def n000_fix_encoding(filename):
         # TODO: error management
 
 
-def n010_remove_U202C(filename):  # NOQA: N802
+def n010_remove_U202C(filename, task_logger):  # NOQA: N802
     """
     Remove all occurrences of char U202C (‬) POP DIRECTIONAL FORMATTING.
 

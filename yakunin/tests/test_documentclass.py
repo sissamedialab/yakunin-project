@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from yakunin.lib import has_documentclass
+from yakunin.utils import has_documentclass
 
 OK_PATTERNS = [
     # simple, real file

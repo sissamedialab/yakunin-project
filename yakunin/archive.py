@@ -1,6 +1,5 @@
 """Extract, compile & watermark WJ TeX archives."""
 
-import glob
 import inspect
 import io
 import logging
@@ -14,27 +13,23 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import filetype
 import requests
 
-import yakunin.log_reading_lib
-import yakunin.src_tidyup_lib
-from yakunin.exceptions import (
+from . import log_reading_lib, src_tidyup_lib
+from .exceptions import (
     NoTeXMasterError,
     PDFGenerationError,
     UnknownArchiveFormatError,
 )
-from yakunin.lib import (
-    TASK_LOGGER_NAME,
-    YAKUNIN_LOGGER,
+from .utils import (
+    TaskLogger,
     aruspica_mime,
-    get_task_logger,
     has_documentclass,
     read_pitstop_report,
+    setup_yakunin,
 )
-from yakunin.utils import setup_yakunin
 
-task_logger = logging.getLogger(TASK_LOGGER_NAME)
+app_logger = logging.getLogger("yakunin")
 
 
 class Archive:
@@ -62,64 +57,44 @@ class Archive:
     def __exit__(self, exc_type, exc_value, traceback):
         """Clean up temp dir when leaving Archive's context."""
         if self.temp_dir and self.temp_dir.exists():
-            if YAKUNIN_LOGGER.getEffectiveLevel() == logging.DEBUG:
-                YAKUNIN_LOGGER.critical("Please remove %s", self.temp_dir)
+            if app_logger.getEffectiveLevel() == logging.DEBUG:
+                app_logger.critical("Please remove %s", self.temp_dir)
             else:
                 shutil.rmtree(self.temp_dir)
 
     def __init__(
         self,
-        tex_master=None,
-        archive=None,
-        base_dir="/tmp",  # noqa: S108
+        archive: str,
+        tex_master: str | None = None,
+        base_dir: str = "/tmp",  # noqa: S108
     ):
         """
-        Allow for some defaults.
+        Initialize an Archive object.
 
-        Raises:
-          ValueError: if an archive is not given.
-
+        Unpack the received "archive" in temporary folder.
         """
         setup_yakunin()
 
-        # TODO: refactor the __init__ so that "archive" is just mandatory
-        if not archive:
-            raise ValueError("Missing archive!")
-
-        self.archive_filename = archive
-        self.archive_name = os.path.split(archive)[-1]
-        # TODO: use only the filename/path, do not open it yet
-        self.archive = io.BytesIO(Path(archive).read_bytes())
-        self.archive.seek(0)
-
-        self.tex_master = tex_master
+        self.tex_master = Path(tex_master) if tex_master else None
         self.main_pdf = None
-
-        # basename = tex_master sans extension
-        self.basename = None
-
-        self.base_dir = base_dir
 
         # temp dir
         # ========
         # The folders "submission" and "work", the task log and the
         # main pdf will be created inside this dir
-        self.temp_dir = Path(tempfile.mkdtemp(dir=self.base_dir))
+        self.temp_dir = Path(tempfile.mkdtemp(dir=base_dir))
 
-        # application logger
-        # ==================
-        # Everything starts here, so I should be able to initialize the
-        # application logger here.
-        task_logger = get_task_logger(self.temp_dir)
-        task_logger.debug("Working in %s", self.temp_dir)
+        # task logger
+        # ===========
+        # This logger writes to a "yakunin-task.log" file in the temp_dir
+        # all relevant steps of the required task. This task log
+        # is meant to be used to communicate with the calling application.
+        self.task_logger = TaskLogger(self.temp_dir)
+        self.task_logger.debug("Working in %s on %s", self.temp_dir, archive)
 
-        self.work_dir = None
+        self.work_dir = self._unpack_archive(archive)
 
-        self.mime_type = None
-        # shutil format for unpack_archive function
-        self.formato = None
-
-    def _unpack_archive(self):
+    def _unpack_archive(self, archive: str) -> Path:
         """
         Open the archive.
 
@@ -130,6 +105,7 @@ class Archive:
         file in a temporary location NB: some operations might fail
 
         Raises:
+          FileNotFoundError: if the archive to process does not exist
           UnknownArchiveFormatError: if we cannot identify the archive format.
           RuntimeError: if something unexpected occurs.
           ReadError: if the archive cannot be read.
@@ -139,27 +115,26 @@ class Archive:
         # ==============
         # contains the received file
         submission_dir = self.temp_dir / "submission"
-        os.mkdir(submission_dir)
-        archive_file = submission_dir / self.archive_name
-        archive_file.write_bytes(self.archive.read())
-        self.archive.seek(0)
+        submission_dir.mkdir(exist_ok=False)
+        archive = Path(archive)
+        if not archive.exists():
+            raise FileNotFoundError
+
+        archive_backup = submission_dir / archive.name
+        archive_backup.write_bytes(archive.read_bytes())
 
         # work dir
         # ========
         # where compilation/watermarking/etc. takes place
-        self.work_dir = self.temp_dir / "work"
-        if self.work_dir.exists():
-            raise RuntimeError(f"Work-dir {self.workdir} already exists. Please check!")
-        os.mkdir(self.work_dir)
+        work_dir = self.temp_dir / "work"
+        work_dir.mkdir(exist_ok=False)
 
         # mime type
         # =========
-        self.mime_type = aruspica_mime(self.archive_filename)
-        # TODO: should be aruspica_mime(self.submission + self.archive_name)
-        # is this too much of an assumption?
-        if not self.mime_type:
-            raise RuntimeError(f"Unknown mime type for {self.archive}. Is aruspica_mime() broken?")
-        task_logger.debug("Archive mime type: %s", self.mime_type)
+        mime_type = aruspica_mime(archive)
+        if not mime_type:
+            raise RuntimeError(f"Unknown mime type for {archive}. Is aruspica_mime() broken?")
+        self.task_logger.debug("Archive mime type: %s", mime_type)
 
         # now that we have a mimetype, lets find a suitable format for
         # shutil.unpack_archive
@@ -177,29 +152,29 @@ class Archive:
             "application/vnd.oasis.opendocument.text": "copy",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "copy",
         }
-        if self.mime_type not in epatografo:
-            task_logger.error("Unknown archive format %s", self.mime_type)
+        if mime_type not in epatografo:
+            self.task_logger.error("Unknown archive format %s", self.mime_type)
             raise UnknownArchiveFormatError
 
-        self.formato = epatografo[self.mime_type]
+        formato = epatografo[mime_type]
 
         # extract/write files
         # ===================
         # TODO: switch to patool? https://libraries.io/pypi/patool
         try:
-            shutil.unpack_archive(archive_file, self.work_dir, self.formato)
+            shutil.unpack_archive(archive_backup, work_dir, formato)
         except shutil.ReadError as exception:
-            YAKUNIN_LOGGER.warning(
-                "Cannot upack %s as %s: %s",
-                archive_file,
-                self.formato,
+            app_logger.warning(
+                "Cannot unpack %s as %s: %s",
+                archive_backup,
+                formato,
                 exception,
             )
             raise
         else:
-            task_logger.info("Unpacked %s as %s", archive_file, self.formato)
+            self.task_logger.info("Unpacked %s as %s", archive_backup, formato)
 
-        os.chdir(self.work_dir)
+        return work_dir
 
     def find_master(self):
         """
@@ -210,13 +185,8 @@ class Archive:
           RuntimeError: if there are no files in the archive.
 
         """
-        if not self.work_dir:
-            # archive has not yet been unpacked;
-            # do the upacking
-            self._unpack_archive()
-
         if self.tex_master:
-            task_logger.info("TeX master (given): %s", self.tex_master)
+            self.task_logger.info("TeX master (given): %s", self.tex_master)
             return
 
         # General idea
@@ -240,15 +210,15 @@ class Archive:
 
         # One file only
         # =============
-        files = glob.glob("**/*", recursive=True)
+        files = list(self.work_dir.glob("**/*"))
         if not files:
             raise RuntimeError("No file to work with? Some error during unpack?")
 
         if len(files) == 1:
-            mime = filetype.guess_mime(files[0])
-            YAKUNIN_LOGGER.debug("Mime of master %s is %s", files[0], mime)
+            mime = aruspica_mime(files[0])
+            app_logger.debug("Mime of master %s is %s", files[0], mime)
             if mime in Archive.non_tex_known_types:
-                task_logger.warning("Mime of master %s is %s. Not TeX!", files[0], mime)
+                self.task_logger.warning("Mime of master %s is %s. Not TeX!", files[0], mime)
                 # do not set tex_master and raise an exception
                 raise NoTeXMasterError
             # else, we the mime type is good
@@ -260,12 +230,12 @@ class Archive:
 
         # .tex
         tex_files = list(
-            filter(lambda x: x.endswith((".tex", ".TEX")), files),
+            filter(lambda x: x.suffix in {".tex", ".TEX"}, files),
         )
 
         if len(tex_files) == 1:
-            self.tex_master = next(iter(tex_files))
-            task_logger.debug(
+            self.tex_master = tex_files[0]
+            self.task_logger.debug(
                 "Many files, but only one .tex. Master is %s",
                 self.tex_master,
             )
@@ -277,21 +247,21 @@ class Archive:
             tex_files = list(filter(has_documentclass, tex_files))
             # TODO: what if no tex has \documentclass???
             # se c'è un main.tex usa quello
-            if "main.tex" in tex_files:
+            if "main.tex" in tex_files:  # FIXME!!! tex_files is a list of Paths!
                 self.tex_master = "main.tex"
             else:
                 # altrimenti prendi quello più vicino alla radice
-                tex_files = sorted(tex_files, key=lambda x: len(os.path.split(x)))
+                tex_files = sorted(tex_files, key=lambda x: len(x.parts))
                 self.tex_master = tex_files[0]
-            task_logger.info(
+            self.task_logger.info(
                 "TeX master (found %s with \\documentclass): %s",
                 len(tex_files),
-                self.tex_master,
+                self.tex_master.name,
             )
             return
 
         # no .tex
-        YAKUNIN_LOGGER.error("WRITE ME!!!")
+        app_logger.error("WRITE ME!!!")
 
     def tex_compile(self, **kwargs):
         """
@@ -306,8 +276,6 @@ class Archive:
         # https://www.artima.com/weblogs/viewpost.jsp?thread=241209
         if not self.tex_master:
             self.find_master()
-        if not self.work_dir:
-            self._unpack_archive()
         tex_engine = kwargs.get("tex_engine", "latexmk -pv- -pdf")
         tex_options = [
             "-interaction=nonstopmode",
@@ -320,11 +288,7 @@ class Archive:
 
         # the tex master can be inside a subdir of "work"
         # we move there and keep only the basename of the tex master
-        self.work_dir /= pathlib.Path(self.tex_master).parent
-
-        self.tex_master = pathlib.Path(self.tex_master).name
-
-        self.basename = pathlib.Path(self.tex_master).stem
+        tex_dir = self.tex_master.parent
 
         # correct known problems in the tex source
         self.tideup_src()
@@ -332,12 +296,12 @@ class Archive:
         # build the compilation command
         args = tex_engine.split()
         args.extend(tex_options)
-        args.append(self.tex_master)
+        args.append(self.tex_master.name)
 
-        task_logger.debug(
+        self.task_logger.debug(
             "ready to compile %s in %s with command %s",
-            self.tex_master,
-            self.work_dir,
+            self.tex_master.name,
+            tex_dir,
             " ".join(args),
         )
         stdout = None
@@ -350,37 +314,37 @@ class Archive:
                 stderr=subprocess.STDOUT,
                 check=True,
                 timeout=timeout,
-                cwd=self.work_dir,
+                cwd=tex_dir,
             )
         except subprocess.CalledProcessError as error:
             # Here I log a warning.
             # Later on, I will examine the situation more accurately
             # an decide whether to eventually log a blocking error
-            task_logger.warning(error)
+            self.task_logger.warning(error)
             # stdout/stderr can be taken from the exception
             stdout = error.stdout
         except subprocess.TimeoutExpired as error:
-            task_logger.error("Compilation timed out after %s seconds", timeout)  # noqa: TRY400
+            self.task_logger.error("Compilation timed out after %s seconds", timeout)  # noqa: TRY400
             stdout = error.stdout
         else:
-            task_logger.info("Successfully compiled %s", self.tex_master)
+            self.task_logger.info("Successfully compiled %s", self.tex_master.name)
             stdout = result.stdout
         finally:
             # dump all stdout/stderr to basename.stdout
             if stdout is not None:
-                (Path(self.work_dir) / f"{self.basename}.stdout").write_bytes(stdout)
+                self.tex_master.with_suffix(".stdout").write_bytes(stdout)
 
         # read the logs (latexmk, latex, etc.)
         # and log away problems as needed
         self.read_log()
 
         # move the final pdf to the "root" of the temp_dir
-        self.main_pdf = self.basename + ".pdf"
-        generated_pdf = os.path.join(self.work_dir, self.main_pdf)
-        if pathlib.Path(generated_pdf).exists():
-            os.rename(generated_pdf, os.path.join(self.temp_dir, self.main_pdf))
+        self.main_pdf = self.tex_master.with_suffix(".pdf").name
+        generated_pdf = tex_dir / self.main_pdf
+        if generated_pdf.exists():
+            generated_pdf.rename(self.temp_dir / self.main_pdf)
         else:
-            task_logger.error("No pdf file produced! Compilation fails.")
+            self.task_logger.error("No pdf file produced! Compilation failed.")
 
         return self.submission_archive()
 
@@ -406,7 +370,7 @@ class Archive:
         wm_y = kwargs.get("y", "620")
         # TODO: timeout is difficult for watermark because we have many steps
 
-        YAKUNIN_LOGGER.debug('watermark requested: "%s"@(%s, %s)', text, wm_x, wm_y)
+        app_logger.debug('watermark requested: "%s"@(%s, %s)', text, wm_x, wm_y)
 
         if not self.main_pdf:
             self.mkpdf(**kwargs)
@@ -441,6 +405,7 @@ class Archive:
             stdout=subprocess.PIPE,
             text=True,
             check=True,
+            cwd=self.work_dir,
         )
         # Example output
         # Page    9 rot:  0
@@ -477,7 +442,7 @@ class Archive:
                 # (since I've never seen anything else)
                 orientation = degrees_to_orientation.get(rotation, "0")
                 if orientation == "0":
-                    task_logger.warning(
+                    self.task_logger.warning(
                         "Found page %s rotated by %d degrees. "
                         "Applying watermark as if there was no rotation. "
                         "Please check.",
@@ -493,7 +458,7 @@ class Archive:
             tempfile.mkstemp(
                 prefix="watermark",
                 suffix=".ps",
-                dir=pathlib.Path.cwd(),
+                dir=self.work_dir,
             )[1],
         )
 
@@ -502,7 +467,7 @@ class Archive:
             tempfile.mkstemp(
                 prefix="watermark",
                 suffix=".pdf",
-                dir=pathlib.Path.cwd(),
+                dir=self.work_dir,
             )[1],
         )
 
@@ -511,7 +476,7 @@ class Archive:
             tempfile.mkstemp(
                 prefix=self._main_pdf_se(),
                 suffix="-wm.pdf",
-                dir=pathlib.Path.cwd(),
+                dir=self.work_dir,
             )[1],
         )
 
@@ -549,6 +514,7 @@ class Archive:
                     watermark_ps_name,
                 ],
                 check=True,
+                cwd=self.work_dir,
             )
 
             # apply the watermark
@@ -562,10 +528,11 @@ class Archive:
                     watermarked_name,
                 ],
                 check=True,
+                cwd=self.work_dir,
             )
 
         else:
-            task_logger.debug("Rotating watermark for pages %s", pages_to_rotate)
+            self.task_logger.debug("Rotating watermark for pages %s", pages_to_rotate)
 
             # create the postscript code
             # https://stackoverflow.com/a/15756108/1581629
@@ -608,6 +575,7 @@ showpage
                     watermark_ps_name,
                 ],
                 check=True,
+                cwd=self.work_dir,
             )
 
             # apply the multibackground
@@ -621,11 +589,12 @@ showpage
                     watermarked_name,
                 ],
                 check=True,
+                cwd=self.work_dir,
             )
 
         self.main_pdf = watermarked_name.name
         watermarked_name.rename(self.temp_dir / self.main_pdf)
-        task_logger.debug("Watermark applied.")
+        self.task_logger.debug("Watermark applied.")
         return self.submission_archive()
 
     def pitstop_validate(self, **kwargs):  # noqa: PLR0915
@@ -637,7 +606,7 @@ showpage
           RuntimeError: when some configuration is wrong.
 
         """
-        YAKUNIN_LOGGER.debug("Pitstop validation requested")
+        app_logger.debug("Pitstop validation requested")
 
         text = kwargs.get("text")
         if text is not None:
@@ -668,7 +637,7 @@ showpage
         if not url:
             raise RuntimeError("Missing pitstop_url. Please check your configuration.")
 
-        task_logger.debug("PDF ready to be sent to Pitstop validation server %s.", url)
+        self.task_logger.debug("PDF ready to be sent to Pitstop validation server %s.", url)
 
         try:
             with open(pdf_file, "rb") as pdf_filehandle:
@@ -686,15 +655,15 @@ showpage
                 )
 
         except requests.exceptions.Timeout:
-            task_logger.error("Pitstop validation timed out after %s seconds", timeout)  # noqa: TRY400
+            self.task_logger.error("Pitstop validation timed out after %s seconds", timeout)  # noqa: TRY400
         else:
             # check the status code
-            task_logger.debug(
+            self.task_logger.debug(
                 "Pitstop validation response status code is %s",
                 response.status_code,
             )
             if response.status_code != 200:
-                task_logger.error(
+                self.task_logger.error(
                     "Pitstop validation failed. Server %s returned code %s.",
                     url,
                     response.status_code,
@@ -709,19 +678,19 @@ showpage
                     )[1],
                 )
                 zip_file.write_bytes(response.content)
-                task_logger.debug("Response received from Pitstop validation server.")
+                self.task_logger.debug("Response received from Pitstop validation server.")
 
                 # check the output
                 # the server will return a text file if something went wrong
                 mime = aruspica_mime(zip_file)
                 if mime != "application/zip":
-                    task_logger.error(
+                    self.task_logger.error(
                         "Pitstop validation failed. Server %s returned a %s file.",
                         url,
                         mime,
                     )
                 else:
-                    task_logger.debug("PDF has been Pitstop-validated.")
+                    self.task_logger.debug("PDF has been Pitstop-validated.")
                     zip_obj = zipfile.ZipFile(io.BytesIO(response.content))
                     # the typical zip file contains:
                     #  . filename-fix-task-rep.xml
@@ -741,7 +710,7 @@ showpage
                     # and how it went
                     task_report_fn = f"{filename_sn}-fix-task-rep.xml"
                     report_fn = f"{filename_sn}-fix-rep.xml"
-                    read_pitstop_report(zip_obj, task_report_fn, report_fn, task="fix")
+                    read_pitstop_report(zip_obj, task_report_fn, report_fn, self.task_logger, task="fix")
 
                     # The second step of the process is the "validation"
                     # let's see if the validation has been done
@@ -752,6 +721,7 @@ showpage
                         zip_obj,
                         task_report_fn,
                         report_fn,
+                        self.task_logger,
                         task="validation",
                     )
 
@@ -762,7 +732,7 @@ showpage
                         # No need to ensure unique name: clash is unlikely
                         self.main_pdf = pdf_fn
                     else:
-                        task_logger.error("Missing %s in zip file %s", pdf_fn, zip_file)
+                        self.task_logger.error("Missing %s in zip file %s", pdf_fn, zip_file)
                 return self.submission_archive()
 
     def topdfa(self, **kwargs):
@@ -774,7 +744,7 @@ showpage
           RuntimeError: when some configuration is wrong.
 
         """
-        YAKUNIN_LOGGER.debug("PDF/A-1b requested")
+        app_logger.debug("PDF/A-1b requested")
 
         if kwargs.get("do_pitstop_validation"):
             self.pitstop_validate(**kwargs)
@@ -799,7 +769,7 @@ showpage
         timeout = kwargs.get("timeout_pdfa", 59)
         if not url:
             raise RuntimeError("Missing pdfa_url. Please check your configuration.")
-        task_logger.debug(
+        self.task_logger.debug(
             "PDF ready to be sent to PDF/A transformation server %s.",
             url,
         )
@@ -819,15 +789,15 @@ showpage
                     timeout=timeout,
                 )
         except requests.exceptions.Timeout:
-            task_logger.error(  # noqa: TRY400
+            self.task_logger.error(  # noqa: TRY400
                 "PDF/A transformation timed out after %s seconds",
                 timeout,
             )
         else:
             # check the status code
-            task_logger.debug("PDF/A response status code is %s", response.status_code)
+            self.task_logger.debug("PDF/A response status code is %s", response.status_code)
             if response.status_code != 200:
-                task_logger.error(
+                self.task_logger.error(
                     "PDF/A transformation failed. Server %s returned code %s.",
                     url,
                     response.status_code,
@@ -842,13 +812,13 @@ showpage
                     )[1],
                 )
                 pdfa_name.write_bytes(response.content)
-                task_logger.debug("Response received from PDF/A transformation server.")
+                self.task_logger.debug("Response received from PDF/A transformation server.")
 
                 # check the output
                 # the server will return a text file if something went wrong
                 mime = aruspica_mime(pdfa_name)
                 if mime != "application/pdf":
-                    task_logger.error(
+                    self.task_logger.error(
                         "PDF/A transformation failed. Server %s returned %s file.",
                         url,
                         mime,
@@ -862,7 +832,7 @@ showpage
                     # move it from work to root dir
                     os.rename(pdfa_name, os.path.join(self.temp_dir, self.main_pdf))
 
-                    task_logger.info("PDF transformed to PDF/A-1b.")
+                    self.task_logger.info("PDF transformed to PDF/A-1b.")
         return self.submission_archive()
 
     def mkpdf(self, **kwargs):
@@ -873,19 +843,15 @@ showpage
           PDFGenerationError: if we can't get a PDF to work with.
 
         """
-        YAKUNIN_LOGGER.debug("mkpdf requested")
-
-        if not self.work_dir:
-            self._unpack_archive()
-
-        files = glob.glob("**/*", recursive=True)
+        app_logger.debug("mkpdf requested")
+        files = list(self.work_dir.glob("**/*"))
         if not files:
             raise PDFGenerationError("No file to work with? Some error during unpack?")
         if len(files) == 1:
             mime = aruspica_mime(files[0])
             if mime == "application/pdf":
-                self.main_pdf = files[0]
-                os.rename(self.main_pdf, os.path.join(self.temp_dir, self.main_pdf))
+                self.main_pdf = files[0].name
+                files[0].rename(self.temp_dir / self.main_pdf)
 
             # ODT or DOCX - transform to pdf via libreoffice
             elif mime in {
@@ -893,15 +859,15 @@ showpage
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             }:
                 if mime == "application/vnd.oasis.opendocument.text":
-                    YAKUNIN_LOGGER.debug("mkpdf received ODT file")
+                    app_logger.debug("mkpdf received ODT file")
                 else:
-                    YAKUNIN_LOGGER.debug("mkpdf received DOCX file")
+                    app_logger.debug("mkpdf received DOCX file")
                 timeout = kwargs.get("timeout_mkpdf", 59)
                 self._convert_to_pdf_via_libreoffice(file=files[0], timeout=timeout)
 
             # DOC - transform to pdf via Word@medusa
             elif mime == "application/msword":
-                YAKUNIN_LOGGER.debug("mkpdf received DOC file")
+                app_logger.debug("mkpdf received DOC file")
                 url = kwargs.get(
                     "url_doc2pdf",
                     "https://medialab.sissa.it/ud/medusa/saveaspdf",
@@ -915,15 +881,15 @@ showpage
                 )
 
         if self.main_pdf is None:
-            task_logger.debug(
-                "mkpdf probably received a tex archive. Will compile",
+            self.task_logger.debug(
+                "mkpdf received a tex-related archive. Will compile",
             )
             self.tex_compile(**kwargs)
 
         if self.main_pdf is None:
             raise PDFGenerationError
 
-        task_logger.info("Main pdf is %s", self.main_pdf)
+        self.task_logger.info("Main pdf is %s", self.main_pdf)
         return self.submission_archive()
 
     def submission_archive(self):
@@ -934,8 +900,6 @@ showpage
         submission dir, the work dir, and the task log.
 
         """
-        if not self.work_dir:
-            self._unpack_archive()
         filename = tempfile.mkstemp()[1]
         result = shutil.make_archive(filename, "gztar", self.temp_dir)
         pathlib.Path(filename).unlink()  # TODO: not thread-safe (?)
@@ -964,18 +928,18 @@ showpage
         # test-files/9578-dg.tar.gz)
 
         competent_functions = inspect.getmembers(
-            yakunin.log_reading_lib,
+            log_reading_lib,
             lambda x: inspect.isfunction(x) and getattr(x, "exposed", False),
         )
         competent_functions = [x[1] for x in competent_functions]
-        YAKUNIN_LOGGER.debug(
+        app_logger.debug(
             "found %s error-reading functions",
             len(competent_functions),
         )
 
-        stdout_log = os.path.join(self.work_dir, self.basename + ".stdout")
+        stdout_log = self.tex_master.with_suffix(".stdout")
         with open(stdout_log, encoding="utf-8") as stdout_file:
-            task_logger.debug("Reading %s", stdout_log)
+            self.task_logger.debug("Reading %s", stdout_log)
 
             # since "next()" disables "tell",
             # I'm going to iterate over the file lines in this funny faction
@@ -983,20 +947,20 @@ showpage
             for line in iter(stdout_file.readline, ""):
                 for func in competent_functions:
                     if line.find(func.search_string) >= 0:
-                        func(line, stdout_file)
+                        func(line, stdout_file, self.task_logger)
 
     def tideup_src(self):
         """Call functions that can fix some known problem in the tex src."""
         competent_functions = inspect.getmembers(
-            yakunin.src_tidyup_lib,
+            src_tidyup_lib,
             inspect.isfunction,
         )
-        YAKUNIN_LOGGER.debug("found %s src-tideup functions", len(competent_functions))
+        app_logger.debug("found %s src-tideup functions", len(competent_functions))
         for funcname, func in competent_functions:
-            YAKUNIN_LOGGER.debug("calling %s on %s", funcname, self.tex_master)
-            func(self.work_dir / self.tex_master)
+            app_logger.debug("calling %s on %s", funcname, self.tex_master)
+            func(self.tex_master, self.task_logger)
 
-    def _move_main_pdf_to_work_dir(self):
+    def _move_main_pdf_to_work_dir(self) -> Path:
         """
         Archive the main PDF.
 
@@ -1004,23 +968,23 @@ showpage
         processing must be applied to the main pdf (watermark,
         validation, pdfa...).
 
+        Returns the path of the moved file.
+
         Raises:
           RuntimeError: when the main pdf is missing.
 
         """
         if not self.main_pdf:
             raise RuntimeError("Trying to move non-existing main pdf to work-dir.")
-        pdf_file = os.path.join(self.work_dir, self.main_pdf)
-        os.rename(os.path.join(self.temp_dir, self.main_pdf), pdf_file)
-        os.chdir(self.work_dir)  # ← is this a good idea???
-        # TODO: self.main_pdf now is WRONG! should I set it to None?
-        return pdf_file
+        src = self.temp_dir / self.main_pdf
+        target = self.work_dir / self.main_pdf
+        return src.rename(target)
 
     def _main_pdf_se(self):
         """Return the name of the main pdf file without the ".pdf" extension."""
         return re.sub(r"\.pdf$", "", self.main_pdf)
 
-    def _convert_to_pdf_via_libreoffice(self, file, timeout=59):
+    def _convert_to_pdf_via_libreoffice(self, file: Path, timeout: int = 59):
         """
         Conver the file via libreoffice.
 
@@ -1053,25 +1017,23 @@ showpage
             stdout, stderr = process.communicate(timeout=timeout)
 
             if process.returncode != 0:
-                task_logger.error("PDF generation failed:")
-                task_logger.error(f"    error returncode: {process.returncode}")
+                self.task_logger.error("PDF generation failed:")
+                self.task_logger.error(f"    error returncode: {process.returncode}")
                 if stderr:
-                    task_logger.error(f"    STDERR: {stderr.decode()}")
+                    self.task_logger.error(f"    STDERR: {stderr.decode()}")
                 if stdout:
-                    task_logger.error(f"    STDOUT: {stdout.decode()}")
+                    self.task_logger.error(f"    STDOUT: {stdout.decode()}")
 
         except subprocess.TimeoutExpired:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             process.wait()
-            task_logger.error("PDF generation timed out after %s seconds", timeout)  # noqa: TRY400
+            self.task_logger.error("PDF generation timed out after %s seconds", timeout)  # noqa: TRY400
         else:
-            task_logger.info("PDF successfully generated.")
-            if file.endswith(".odt"):
-                self.main_pdf = re.sub(r"\.odt$", ".pdf", file)
-            elif file.endswith(".docx"):
-                self.main_pdf = re.sub(r"\.docx$", ".pdf", file)
+            self.task_logger.info("PDF successfully generated.")
+            if file.suffix in {".odt", ".docx"}:
+                self.main_pdf = file.with_suffix(".pdf").name
             else:
-                task_logger.error(
+                self.task_logger.error(
                     f"Unknow extension on file {self.main_pdf}. Please check!",
                 )
         finally:
@@ -1089,7 +1051,7 @@ showpage
           PDFGenerationError: if we can't get a PDF to work with.
 
         """
-        task_logger.debug(
+        self.task_logger.debug(
             "DOCX %s ready to be sent to doc-to-pdf server %s.",
             file,
             url,
@@ -1110,7 +1072,7 @@ showpage
                     timeout=timeout,
                 )
         except requests.exceptions.Timeout:
-            task_logger.error(  # noqa: TRY400
+            self.task_logger.error(  # noqa: TRY400
                 "doc-to-pdf conversion timed out after %s seconds",
                 timeout,
             )
@@ -1118,7 +1080,7 @@ showpage
         else:
             # check the status code
             if response.status_code != 200:
-                task_logger.error(
+                self.task_logger.error(
                     "doc-to-pdf failed. Server %s returned code %s.",
                     url,
                     response.status_code,
@@ -1135,13 +1097,13 @@ showpage
                 )[1],
             )
             pdf_name.write_bytes(response.content)
-            task_logger.debug("Response received from doc-to-pdf server.")
+            self.task_logger.debug("Response received from doc-to-pdf server.")
 
             # check the output
             # the server will return a text file if something went wrong
             mime = aruspica_mime(pdf_name)
             if mime != "application/pdf":
-                task_logger.error(
+                self.task_logger.error(
                     "doc-to-pdf transformation failed. Server %s returned %s file.",
                     url,
                     mime,
@@ -1155,4 +1117,4 @@ showpage
             # move it from work to root dir
             os.rename(pdf_name, os.path.join(self.temp_dir, self.main_pdf))
 
-            task_logger.info("DOCX transformed to PDF.")
+            self.task_logger.info("DOCX transformed to PDF.")

@@ -114,6 +114,75 @@ def test_send_pdf(
     assert expected_date in out_content
 
 
+def process_response(response: requests.Response, tmp_path: Path, output_name: str) -> str:
+    """
+    Process a response from the yakunin service.
+
+    Extract the tar.gz and find the task-log.
+
+    Args:
+        response: The HTTP response from the service
+        tmp_path: Temporary directory for extraction
+        output_name: Name prefix for output files
+
+    Returns:
+        The text content of the task-log
+
+    """
+    assert response.status_code == 200
+    out_fname = tmp_path / f"{output_name}.tar.gz"
+    out_fname.write_bytes(response.content)
+
+    extract_dir = tmp_path / output_name
+    extract_dir.mkdir(exist_ok=True)
+
+    subprocess.run(
+        args=("tar", "xf", out_fname, "-C", extract_dir),
+        check=True,
+    )
+    return (extract_dir / "yakunin-task.log").read_text()
+
+
+def test_concurrent_conversions_independent_tasklogs(
+    yakunin_service: Callable,
+    tmp_path: Path,
+):
+    """Test that the logs of the task are independent of other tasks."""
+    url = f"http://localhost:{PORT}/mkpdf/"
+
+    fname_1 = "01-test.tex"  # NB: note that the file-names are different!
+    fname_2 = "10-test-tex"
+    fpath_1 = Path(ARCHIVES_DIR) / fname_1
+    fpath_2 = Path(ARCHIVES_DIR) / fname_2
+    import concurrent.futures
+
+    def make_request(fname) -> requests.Response:
+        """Make a single request to the service."""
+        with fname.open(mode="rb") as in_fhandle:
+            return requests.post(
+                url,
+                files={"file": in_fhandle},
+                timeout=11,
+            )
+
+    # Make two concurrent requests
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        future1 = executor.submit(make_request, fpath_1)
+        future2 = executor.submit(make_request, fpath_2)
+
+        response1 = future1.result()
+        response2 = future2.result()
+
+    # Maybe a bit weak as test: we expect to find references to the
+    # processed file only in the task-log of the relative request.
+    out_content1 = process_response(response1, tmp_path, "request1")
+    out_content2 = process_response(response2, tmp_path, "request2")
+    assert fname_1 in out_content1
+    assert fname_1 not in out_content2
+    assert fname_2 in out_content2
+    assert fname_2 not in out_content1
+
+
 def suffix(day):
     """Return the ordinal suffix for a day."""
     if 11 <= day <= 13:
