@@ -233,9 +233,13 @@ def ini_to_kwargs(request: HttpRequest) -> dict[str, Any]:
     posted_ini_file = request.FILES["ini"]
     config = configparser.ConfigParser()
     config.read_string(posted_ini_file.read().decode("utf-8"))
-    if "wjs" in config.sections():
-        return dict(config["wjs"])
-    logger.warning(
-        f'Received ini file {posted_ini_file.name} does not have section "wjs".',
-    )
-    return {}
+    if "wjs" not in config.sections():
+        logger.warning(
+            f'Received ini file {posted_ini_file.name} does not have section "wjs".',
+        )
+        return {}
+    kwargs = {}
+    for key, value in dict(config["wjs"]).items():
+        # assume timeouts in seconds and cast to int (to be used in subprocess.run(timeout))
+        kwargs[key] = int(value) if key.startswith("timeout_") else value
+    return kwargs
