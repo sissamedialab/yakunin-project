@@ -405,22 +405,31 @@ def verify_environment() -> list[[str, str]]:
 class TaskLogger:
     """A simple logger that writes messages to a file."""
 
-    def __init__(self, basedir: Path, filename: str = TASK_LOGFILE_NAME):
+    def __init__(self, basedir: Path, filename: str = TASK_LOGFILE_NAME, extra_logger=None):
         """
         Initialize the task logger.
 
         Args:
-            basedir: Directory where the log file will be created
-            filename: Name of the log file (default: yakunin-task.log)
+          basedir: Directory where the log file will be created
+          filename: Name of the log file (default: yakunin-task.log)
+          extra_logger: Optional additional logger for sending messages to external
+            systems (e.g., WebSocket feedback channel).
+            Should implement a logging-like interface with debug(), info(), warning(), error() methods.
 
         """
         self.log_file = basedir / filename
         self.log_file.touch()  # Create the file
+        self.extra_logger = extra_logger
+        self._has_warnings = None
+        self._has_errors = None
 
     def _write(self, level: str, msg: str):
         """Write a message to the log file."""
         with open(self.log_file, "a", encoding="utf-8") as f:
             f.write(f"{level} {msg}\n")
+        if self.extra_logger:
+            func = getattr(self.extra_logger, level.lower(), self.extra_logger.error)
+            func(msg)
 
     def debug(self, msg: str, *args):
         """Log a debug message."""
@@ -438,6 +447,7 @@ class TaskLogger:
 
     def warning(self, msg: str, *args):
         """Log a warning message."""
+        self._has_warnings = True
         if args:
             msg %= args
         self._write("WARNING", msg)
@@ -445,6 +455,7 @@ class TaskLogger:
 
     def error(self, msg: str, *args):
         """Log an error message."""
+        self._has_errors = True
         if args:
             msg %= args
         self._write("ERROR", msg)
@@ -452,8 +463,56 @@ class TaskLogger:
 
     def exception(self, msg: str):
         """Log an exception message."""
+        self._has_errors = True
         import traceback
 
         self._write("ERROR", msg)
         self._write("ERROR", traceback.format_exc())
         app_logger.exception(msg)  # noqa: LOG004
+
+    def append_content(self, content: bytes | str | Path, encoding: str = "utf-8"):
+        """
+        Append content to the log file.
+
+        Args:
+            content: Can be bytes, a string, or a Path to a file whose content should be appended
+            encoding: Encoding to use when writing strings or reading files (default: utf-8)
+
+        Raises:
+            TypeError: If the content cannot be understood
+            FileNotFoundError: If the content file to be added does not exists
+
+        """
+        with open(self.log_file, "ab") as f:  # Open in binary append mode
+            if isinstance(content, bytes):
+                f.write(content)
+            elif isinstance(content, str):
+                f.write(content.encode(encoding))
+            elif isinstance(content, Path):
+                if content.exists() and content.is_file():
+                    with open(content, "rb") as source:
+                        shutil.copyfileobj(source, f)
+                else:
+                    error_msg = f"File not found or not a file: {content}"
+                    self.error(error_msg)
+                    raise FileNotFoundError(error_msg)
+            else:
+                raise TypeError(f"Unsupported content type: {type(content)}")
+
+    def result(self) -> str:
+        """
+        Give a short summary or result of the logged process.
+
+        Returns:
+          error: if any error has been logged
+          warning: if no error has been logged, but some warnings have been
+          success: if no errors/warnings have been logged
+
+        """
+        if self._has_errors:
+            return "error"
+
+        if self._has_warnings:
+            return "warning"
+
+        return "success"

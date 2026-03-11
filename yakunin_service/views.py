@@ -1,11 +1,9 @@
 import configparser
 import dataclasses
 import json
-import logging
 import shutil
 import ssl
 import tempfile
-from base64 import b64encode
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +14,7 @@ from django.views.decorators.http import require_http_methods
 from websockets.sync.client import ClientConnection, connect
 
 from yakunin.archive import Archive
-
-logger = logging.getLogger(__name__)
+from yakunin.utils import app_logger as logger
 
 
 @dataclasses.dataclass
@@ -33,7 +30,7 @@ class WSLogger:
             try:
                 if self.feedback_ws_url.startswith("wss://") and settings.DEBUG:
                     # Allow for self-signed certificates during development:
-                    ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_SERVER)
+                    ssl_context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS_CLIENT)
                     ssl_context.check_hostname = False
                     ssl_context.verify_mode = ssl.CERT_NONE
                     self.feedback_ws = connect(self.feedback_ws_url, ssl=ssl_context)
@@ -44,36 +41,26 @@ class WSLogger:
                     f"Could not connect to websocket {self.feedback_ws_url}: {e}",
                 )
 
-    def _send(self, status: str, msg: str, data: str | None = None):
+    def _send(self, result: str, msg: str, data: str | None = None):
         """Send a message to the feedback websocket."""
         if not self.feedback_ws_url or not self.feedback_ws:
             return
-        message_type = "completed.data" if data else "feedback.message"
 
-        self.feedback_ws.send(
-            json.dumps(
-                {
-                    "type": message_type,
-                    "message": {
-                        "status": status,
-                        "text": msg,
-                        "data": data,
+        try:
+            self.feedback_ws.send(
+                json.dumps(
+                    {
+                        "type": "feedback.message",
+                        "message": {
+                            "result": result,
+                            "text": msg,
+                            "data": data,
+                        },
                     },
-                },
-            ),
-        )
-
-    def completed(self, msg: str, content: bytes | None = None):
-        """
-        Log message to the websocket as completed state.
-
-        Content of the yakunin payload can be passed to log result of the conversion.
-        """
-        self._send("completed", msg, b64encode(content).decode() if content else "")
-
-    def running(self, msg: str):
-        """Log message to the websocket as running state."""
-        self._send("running", msg)
+                ),
+            )
+        except TypeError:
+            logger.warning(f"Could not send feedback {result=}; {msg=}; {data=}.")
 
     def started(self, msg: str):
         """Log message to the websocket as started state."""
@@ -83,9 +70,17 @@ class WSLogger:
         """Log message to the websocket as debug state."""
         self._send("debug", msg)
 
+    def info(self, msg: str):
+        """Log message to the websocket as debug state."""
+        self._send("info", msg)
+
     def error(self, msg: str):
         """Log message to the websocket as error state."""
         self._send("error", msg)
+
+    def warning(self, msg: str):
+        """Log message to the websocket as warning state."""
+        self._send("warning", msg)
 
     def close(self):
         """Close the websocket."""
@@ -123,35 +118,36 @@ def mkpdf(request: HttpRequest) -> HttpResponse:
             ws_logger.started("🎌 PDF generation started...")
         else:
             ws_logger.started("PDF generation started...")
+
+        archive_path, temp_dir = get_main_file(request)
+        ws_logger.info(f"Working on {archive_path}")
+
+        options = ini_to_kwargs(request)
+        ws_logger.debug(f"Options: {options}")
+
         try:
-            archive_path, temp_dir = get_main_file(request)
-            ws_logger.running(f"Working on {archive_path}")
-            options = ini_to_kwargs(request)
-            ws_logger.debug(f"Options: {options}")
-            archive = Archive(archive=archive_path)
+            archive = Archive(archive=archive_path, extra_logger=ws_logger)
             archive.mkpdf(**options)
             output_archive_path = Path(archive.submission_archive())
-            ws_logger.running("mkpdf completed")
 
-            with output_archive_path.open(mode="rb") as f:
-                file_data = f.read()
+        except Exception as e:  # noqa: BLE001
+            ws_logger.error("Raised exception during conversion")  # noqa: TRY400
+            logger.exception(str(e))
+        else:
+            ws_logger.info("PDF generation completed")
 
-            response = HttpResponse(file_data, content_type="application/gzip")
-            response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
+        file_data = output_archive_path.read_bytes()
+        response = HttpResponse(file_data, content_type="application/gzip")
+        response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
 
-            logger.info(
-                f"Sending back {output_archive_path.name} as per request. "
-                f"Cleaning {temp_dir} and {output_archive_path}",
-            )
-            shutil.rmtree(temp_dir)
-            Path(output_archive_path).unlink()
-            ws_logger.completed("Sending back response.", file_data)
-        except Exception as e:
-            ws_logger.error(str(e))  # noqa: TRY400
-            logger.exception(
-                "Raised exception during conversion",
-            )
-            response = HttpResponse(str(e), status=500)
+        logger.info(
+            f"Sending back {output_archive_path.name} as per request. Cleaning {temp_dir} and {output_archive_path}",
+        )
+
+        ws_logger.info(msg="Response sent back.")
+
+        shutil.rmtree(temp_dir)
+        output_archive_path.unlink()
 
     return response
 
@@ -170,36 +166,36 @@ def watermark(request: HttpRequest) -> HttpResponse:
             ws_logger.started("🎌 PDF generation started...")
         else:
             ws_logger.started("PDF generation started...")
-        try:
-            archive_path, temp_dir = get_main_file(request)
-            ws_logger.running(f"Working on {archive_path}")
-            options = ini_to_kwargs(request)
-            ws_logger.debug(f"Options: {options}")
 
-            archive = Archive(archive=archive_path)
+        archive_path, temp_dir = get_main_file(request)
+        ws_logger.info(f"Working on {archive_path}")
+
+        options = ini_to_kwargs(request)
+        ws_logger.debug(f"Options: {options}")
+
+        try:
+            archive = Archive(archive=archive_path, extra_logger=ws_logger)
             archive.watermark(**options)
             output_archive_path = Path(archive.submission_archive())
-            ws_logger.running("watermark applied")
 
-            with output_archive_path.open(mode="rb") as f:
-                file_data = f.read()
+        except Exception as e:  # noqa: BLE001
+            ws_logger.error("Raised exception during conversion")  # noqa: TRY400
+            logger.exception(str(e))
+        else:
+            ws_logger.info("Watermarking process completed")
 
-            response = HttpResponse(file_data, content_type="application/gzip")
-            response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
+        file_data = output_archive_path.read_bytes()
+        response = HttpResponse(file_data, content_type="application/gzip")
+        response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
 
-            logger.info(
-                f"Sending back {output_archive_path.name} as per request. "
-                f"Cleaning {temp_dir} and {output_archive_path}",
-            )
-            shutil.rmtree(temp_dir)
-            Path(output_archive_path).unlink()
-            ws_logger.completed("Sending back response.", file_data)
-        except Exception as e:
-            ws_logger.error(str(e))  # noqa: TRY400
-            logger.exception(
-                "Raised exception during conversion",
-            )
-            response = HttpResponse(str(e), status=500)
+        logger.info(
+            f"Sending back {output_archive_path.name} as per request. Cleaning {temp_dir} and {output_archive_path}",
+        )
+
+        ws_logger.info(msg="Response sent back.")
+
+        shutil.rmtree(temp_dir)
+        output_archive_path.unlink()
 
     return response
 
@@ -238,8 +234,15 @@ def ini_to_kwargs(request: HttpRequest) -> dict[str, Any]:
             f'Received ini file {posted_ini_file.name} does not have section "wjs".',
         )
         return {}
+
+    # If given, the following keys should have an int value:
+    known_int_keys = {
+        "timeout_compilation",
+        "timeout_pitstop",
+        "timeout_pdfa",
+        "timeout_mkpdf",
+    }
     kwargs = {}
     for key, value in dict(config["wjs"]).items():
-        # assume timeouts in seconds and cast to int (to be used in subprocess.run(timeout))
-        kwargs[key] = int(value) if key.startswith("timeout_") else value
+        kwargs[key] = int(value) if key in known_int_keys else value
     return kwargs

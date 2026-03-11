@@ -104,7 +104,8 @@ def _archive_compilation_tester(xml_desc):  # noqa: PLR0914
 
     archive_obj = Archive(archive=filename)
     func = getattr(archive_obj, command)
-    result = func(**options)
+    func(**options)
+    result = archive_obj.submission_archive()
 
     assert pathlib.Path(result).exists()
 

@@ -60,6 +60,7 @@ services:
       - "jcom:${HOST_IP:-172.17.0.1}"
       - "jcom.local:${HOST_IP:-172.17.0.1}"
       - "jquant.local:${HOST_IP:-172.17.0.1}"
+      - "jquant.localdomain.net:${HOST_IP:-172.17.0.1}"
 
   # Usefult for network debugging: get an image with inetutils:
   # busybox:
