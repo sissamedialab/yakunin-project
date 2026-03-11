@@ -8,3 +8,6 @@ scratch
 db.sqlite3
 .aider*
 .env
+
+.dir-locals.el
+.python-version

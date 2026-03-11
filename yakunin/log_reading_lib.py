@@ -184,7 +184,7 @@ def file_not_found(line, file_handle, task_logger):
     # Try typing  <return>  to proceed.
 
     missing_file = re.match(FILE_NOT_FOUND_P, line)
-    missing_file = missing_file.group(1)
+    missing_file = missing_file.group(1) if missing_file else "NA"
 
     report_error_and_line(
         file_handle,
@@ -203,3 +203,94 @@ def bbl_wrong_version(line, file_handle, task_logger):
         task_logger.warning(
             "bbl version mismatch. This can lead to errors. Please see FAQ-123",
         )
+
+
+@expose(search_string="! TeX capacity exceeded")
+def recursive_definition(line, file_handle, task_logger):
+    """
+    Report tex-capacity-exceeds errors.
+
+    These are often caused by recursive definitions.
+    We'll report the first word of the next line as possible culprit.
+    """
+    next_line = file_handle.readline()
+    pesky_cs = next_line.strip().split(" ")[-1]
+
+    report_error_and_line(
+        file_handle,
+        f'TeX capacity exceeded. Please check if you have a recursive definition of "{pesky_cs}"',
+        "MISSING",
+        task_logger,
+        faq="Please see FAQ-123.",
+    )
+
+
+@expose(search_string="! You can't use `macro parameter character #' in horizontal mode")
+def number_sign_in_wrong_place(line, file_handle, task_logger):
+    """Handle macro parameter character # in horizontal mode error."""
+    next_line = file_handle.readline()
+    pesky_item = next_line.strip().split()[0] if next_line.strip() else "#"
+
+    report_error_and_line(
+        file_handle,
+        f'You cannot use the macro parameter character "#" in horizontal mode. Problem near "{pesky_item}".',
+        "Could not understand macro parameter character error.",
+        task_logger,
+        faq="Please see FAQ-123.",
+    )
+
+
+@expose(search_string="! Missing $ inserted.")
+def missing_dollar_sign(line, file_handle, task_logger):
+    """Handle missing $ inserted error."""
+    report_error_and_line(
+        file_handle,
+        "Missing $ inserted. You probably have math mode content outside of math mode.",
+        "Could not understand missing-dollar-sign error.",
+        task_logger,
+        faq="Please see FAQ-123.",
+    )
+
+
+@expose(search_string="LaTeX Warning: Command")
+def invalid_command_in_math_mode(line, file_handle, task_logger):
+    """Handle invalid command in math mode warning."""
+    if "invalid in math mode on input line" in line:
+        # Extract command name from the warning line
+        parts = line.split()
+        command = parts[3] if len(parts) > 3 else "unknown"
+
+        report_error_and_line(
+            file_handle,
+            f'Command "{command}" is invalid in math mode.',
+            "Could not understand invalid-command-in-math-mode error.",
+            task_logger,
+            faq="Please see FAQ-123.",
+        )
+
+
+@expose(search_string=r"! Please use \\mathaccent for accents in math mode.")
+def accents_in_math_mode(line, file_handle, task_logger):
+    """Handle accents in math mode error."""
+    report_error_and_line(
+        file_handle,
+        r"Please use \mathaccent for accents in math mode.",
+        "Could not understand accents-in-math-mode error.",
+        task_logger,
+        faq="Please see FAQ-123.",
+    )
+
+
+@expose(search_string="! Too many }'s")
+def too_many_right_curly_bracket(line, file_handle, task_logger):
+    """Handle too many right curly brackets error."""
+    next_line = file_handle.readline()
+    pesky_item = next_line.strip().split()[0] if next_line.strip() else "}"
+
+    report_error_and_line(
+        file_handle,
+        f'Too many right curly brackets. Problem near "{pesky_item}".',
+        "Could not understand too-many-right-curly-bracket error.",
+        task_logger,
+        faq="Please see FAQ-123.",
+    )
