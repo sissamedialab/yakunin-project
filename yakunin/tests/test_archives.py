@@ -1,6 +1,7 @@
 """Test that all archives in test-files get compiled."""
 
 import os
+import zipfile
 
 import pytest
 
@@ -88,3 +89,37 @@ def test_tex_master_guessing(archive, master):
     with Archive(archive=archive) as arc:
         arc.find_master()
         assert arc.tex_master.name == master
+
+
+def test_zip_slip(tmp_path, caplog) -> None:
+    """
+    Test that zips containing path traversal entries are rejected.
+
+    Note that Archive uses shutils.unpack_archive(),
+    that silently ignores any path
+    that contains ".."
+    or that starts with "/".
+    """
+    evil_paths = [
+        "../../evil__two-up.txt",
+        "../evil__one-up.txt",
+        "aa/bb/../../../evil__two-down-three-up.txt",
+        "/evil__root.txt",
+        "/tmp/evil__tmp.txt",  # noqa: S108
+    ]
+
+    zip_path = tmp_path / "x.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("good.txt", "good payload")
+        for evil_path in evil_paths:
+            zf.writestr(evil_path, "zip slip payload")
+
+    a = Archive(archive=zip_path)
+    extracted_files = [f.name for f in a.work_dir.iterdir()]
+    assert len(extracted_files) == 1
+    assert "good.txt" in extracted_files
+
+    for evil_path in evil_paths:
+        assert not (a.work_dir / evil_path).resolve().exists()
+
+    assert a.can_continue is True
