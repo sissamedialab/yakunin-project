@@ -299,7 +299,7 @@ class Archive:
             "-interaction=nonstopmode",
         ]
 
-        timeout = kwargs.get("timeout_compilation", 13)
+        timeout = kwargs.get("timeout_compilation", 59)
 
         if not self.tex_master or not tex_engine:
             self.task_logger.error(f"Missing either tex master ({self.tex_master}) or tex engine {tex_engine}")
