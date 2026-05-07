@@ -1020,7 +1020,7 @@ showpage
 
     def _convert_to_pdf_via_libreoffice(self, file: Path, timeout: int = 59):
         """
-        Conver the file via libreoffice.
+        Convert the file via libreoffice.
 
         If all goes well, self.main_pdf will be set.
         """
@@ -1051,29 +1051,38 @@ showpage
                 stderr=subprocess.PIPE,
                 start_new_session=True,
             )
-
             stdout, stderr = process.communicate(timeout=timeout)
-
-            if process.returncode != 0:
-                self.task_logger.error("PDF generation failed:")
-                self.task_logger.error(f"    error returncode: {process.returncode}")
-                if stderr:
-                    self.task_logger.error(f"    STDERR: {stderr.decode()}")
-                if stdout:
-                    self.task_logger.error(f"    STDOUT: {stdout.decode()}")
-
         except subprocess.TimeoutExpired:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             process.wait()
             self.task_logger.error(f"PDF generation timed out after {timeout} seconds")  # noqa: TRY400
+            self.can_continue = False
+            return
+        finally:
+            shutil.rmtree(uniq_profile_dir)
+
+        expected_pdf = Path(self.temp_dir) / file.with_suffix(".pdf").name
+
+        if process.returncode != 0:
+            self.task_logger.error(f"PDF generation failed with returncode {process.returncode}:")
+            if stderr:
+                self.task_logger.error(f"    STDERR: {stderr.decode()}")
+            if stdout:
+                self.task_logger.error(f"    STDOUT: {stdout.decode()}")
+            self.can_continue = False
+        elif not expected_pdf.exists():
+            self.task_logger.error(f"PDF generation produced no output: expected file {expected_pdf} not found")
+            if stderr:
+                self.task_logger.error(f"    STDERR: {stderr.decode()}")
+            if stdout:
+                self.task_logger.error(f"    STDOUT: {stdout.decode()}")
+            self.can_continue = False
         else:
             self.task_logger.info("PDF successfully generated.")
             if file.suffix in {".odt", ".docx"}:
                 self.main_pdf = file.with_suffix(".pdf").name
             else:
-                self.task_logger.error(f"Unknow extension on file {self.main_pdf}. Please check!")
-        finally:
-            shutil.rmtree(uniq_profile_dir)
+                self.task_logger.error(f"Unknow extension on file {file}. Please check!")
 
     def _convert_to_pdf_via_word_on_windows(self, file, url, mime, timeout=59):
         """
