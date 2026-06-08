@@ -2,7 +2,7 @@
 # See also CI variables
 ARG ML_VERSION="trixie-tl25-py313-ml2"
 FROM registry.gitlab.sissamedialab.it/calderan/medialab-sty/medialab-sty:$ML_VERSION
-LABEL mantainer="wjs-support@medialab.sissa.it>"
+LABEL mantainer="wjs-support@sissamedialab.it>"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \

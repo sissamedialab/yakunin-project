@@ -2,7 +2,7 @@
 # See also CI variables
 ARG ML_VERSION="trixie-tl25-py313-ml2"
 FROM registry.gitlab.sissamedialab.it/wjs/yakunin-project/requirements:$ML_VERSION
-LABEL mantainer="wjs-support@medialab.sissa.it>"
+LABEL mantainer="wjs-support@sissamedialab.it>"
 
 COPY --chown=app:app . /workdir
 RUN --mount=type=cache,target=/home/app/.cache/pip,uid=1000,gid=1000 \

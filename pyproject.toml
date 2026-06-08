@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.7"
 license =  "GPL-3.0-or-later"
 authors = [
-    { name = "Matteo", email = "gamboz@medialab.sissa.it" }
+    { name = "Matteo", email = "gamboz@sissamedialab.it" }
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
