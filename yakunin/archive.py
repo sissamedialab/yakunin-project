@@ -960,7 +960,23 @@ showpage
         )
 
         stdout_log = self.tex_master.with_suffix(".stdout")
-        with open(stdout_log, encoding="utf-8") as stdout_file:
+
+        # pdflatex's stdout can contain bytes that are not valid UTF-8
+        # (e.g. font-encoding slots[*] dumped in overfull-hbox warnings, or
+        # genuinely mis-encoded source files). errors="replace" turns any
+        # such byte into U+FFFD instead of raising, regardless of which
+        # encoding it came from, so we never need an encoding fallback.
+        #
+        # [*]
+        # pdfTeX's log/stdout is byte-oriented in the font encoding, not UTF-8
+        # =========================================================
+        # E.g., an overfull \hbox warning prints the contents of the offending box, character by character,
+        # as their slots in the active font.
+        # pdfTeX writes those slot values out as raw bytes.
+        # So it emits the literal byte 0xF2 to stdout.
+        # It might look like latin-1 but that's a coincidence of encoding-table design,
+        # not pdfTeX choosing latin-1.
+        with open(stdout_log, encoding="utf-8", errors="replace") as stdout_file:
             self.task_logger.debug(f"Reading {stdout_log}")
 
             # since "next()" disables "tell",
