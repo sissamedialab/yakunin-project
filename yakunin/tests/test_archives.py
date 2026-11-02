@@ -1,7 +1,10 @@
 """Test that all archives in test-files get compiled."""
 
+import io
 import os
+import tarfile
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -123,3 +126,68 @@ def test_zip_slip(tmp_path, caplog) -> None:
         assert not (a.work_dir / evil_path).resolve().exists()
 
     assert a.can_continue is True
+
+
+def _add_member(tf: tarfile.TarFile, name: str, payload: bytes = b"payload", **attrs) -> None:
+    """Add a member to tf; attrs (type, linkname, mode, ...) are set on the TarInfo."""
+    info = tarfile.TarInfo(name)
+    info.size = len(payload) if attrs.get("type", tarfile.REGTYPE) == tarfile.REGTYPE else 0
+    for key, value in attrs.items():
+        setattr(info, key, value)
+    tf.addfile(info, io.BytesIO(payload) if info.size else None)
+
+
+EVIL_TAR_MEMBERS = {
+    "one-up": [{"name": "../evil__one-up.txt"}],
+    "two-down-three-up": [{"name": "aa/bb/../../../evil__two-down-three-up.txt"}],
+    "absolute": [{"name": "/tmp/evil__tmp.txt"}],  # noqa: S108
+    "symlink-absolute": [{"name": "passwd", "type": tarfile.SYMTYPE, "linkname": "/etc/passwd"}],
+    "symlink-up": [{"name": "up", "type": tarfile.SYMTYPE, "linkname": "../.."}],
+    "write-through-symlink": [
+        {"name": "dir", "type": tarfile.SYMTYPE, "linkname": ".."},
+        {"name": "dir/evil__through-symlink.txt"},
+    ],
+    "hardlink-outside": [{"name": "shadow", "type": tarfile.LNKTYPE, "linkname": "/etc/passwd"}],
+    "device": [{"name": "evil__dev", "type": tarfile.CHRTYPE, "devmajor": 1, "devminor": 3}],
+}
+
+
+@pytest.mark.parametrize("compression", ["", "gz", "bz2"])
+@pytest.mark.parametrize("case", EVIL_TAR_MEMBERS)
+def test_tar_slip(tmp_path, case, compression) -> None:
+    """Test that tars with path traversal / dangerous links are rejected (tarfile "data" filter)."""
+    tar_path = tmp_path / "upload" / f"x.tar.{compression}" if compression else tmp_path / "upload" / "x.tar"
+    tar_path.parent.mkdir()
+    with tarfile.open(tar_path, f"w:{compression}") as tf:
+        _add_member(tf, "good.tex", b"\\documentclass{article}")
+        for member in EVIL_TAR_MEMBERS[case]:
+            _add_member(tf, **member)
+
+    a = Archive(archive=tar_path)
+
+    # "data" filter strips leading "/" from absolute names: extracted (harmlessly) inside work_dir
+    assert a.can_continue is (case == "absolute")
+    for path in a.temp_dir.rglob("evil__*"):
+        # only acceptable if inside work_dir (it shouldn't, but it would be harmless)
+        assert a.work_dir in path.parents, f"{path} written outside work_dir"
+    assert not (a.work_dir / "passwd").exists()
+    assert not (a.work_dir / "shadow").exists()
+    assert not (a.work_dir / "up").exists()
+    assert not list(tmp_path.glob("evil__*"))
+    assert not Path("/tmp/evil__tmp.txt").exists()  # noqa: S108
+
+
+def test_tar_safe_links_are_kept(tmp_path) -> None:
+    """Test that the "data" filter still allows links that stay inside the archive."""
+    tar_path = tmp_path / "x.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tf:
+        _add_member(tf, "sub/real.tex", b"real")
+        _add_member(tf, "alias.tex", type=tarfile.SYMTYPE, linkname="sub/real.tex")
+        _add_member(tf, "hard.tex", type=tarfile.LNKTYPE, linkname="sub/real.tex")
+
+    a = Archive(archive=tar_path)
+
+    assert a.can_continue is True
+    assert (a.work_dir / "alias.tex").is_symlink()
+    assert (a.work_dir / "alias.tex").read_bytes() == b"real"
+    assert (a.work_dir / "hard.tex").read_bytes() == b"real"

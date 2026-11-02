@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import subprocess
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
@@ -25,6 +26,9 @@ from .utils import (
 )
 
 app_logger = logging.getLogger("yakunin")
+
+# shutil.unpack_archive formats handled by tarfile
+TAR_FORMATS = {"tar", "gztar", "bztar", "xztar", "zstdtar"}
 
 
 class Archive:
@@ -181,9 +185,14 @@ class Archive:
         # extract/write files
         # ===================
         # TODO: switch to patool? https://libraries.io/pypi/patool
+        # Tar archives come from untrusted users: use the "data" extraction filter to reject
+        # path traversal, absolute paths, links pointing outside work_dir, device files, etc.
+        # Python < 3.14 defaults to the unsafe "fully_trusted" filter.
+        # Only the built-in tar formats accept `filter`: our custom unpackers (see utils.py) do not.
+        unpack_kwargs = {"filter": "data"} if formato in TAR_FORMATS else {}
         try:
-            shutil.unpack_archive(archive_backup, work_dir, formato)
-        except shutil.ReadError as exception:
+            shutil.unpack_archive(archive_backup, work_dir, formato, **unpack_kwargs)
+        except (shutil.ReadError, tarfile.TarError) as exception:
             app_logger.warning(
                 "Cannot unpack %s as %s: %s",
                 archive_backup,
