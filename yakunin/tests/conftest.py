@@ -244,7 +244,7 @@ def well_formed(result_archive) -> (Path, str):
     """
     try:
         tmp_dir = Path(tempfile.mkdtemp())
-        shutil.unpack_archive(result_archive, tmp_dir)
+        shutil.unpack_archive(result_archive, tmp_dir, filter="data")
         files = os.listdir(tmp_dir)
 
         # the task log is in the archive
