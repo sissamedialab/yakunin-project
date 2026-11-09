@@ -78,3 +78,21 @@ def test_send_bad_tex(
     # to see the logs: pprint(log_content)
     # to see the logs: pprint((tmp_path / "work" / "test.stdout").read_text())
     # to see the logs: assert False
+
+
+def test_exception_during_processing(yakunin_service: Callable, tmp_path: Path):
+    """An exception while processing gives a 500 with an explanation (not an UnboundLocalError)."""
+    url = f"http://localhost:{PORT}/watermark/"
+    tex_filepath = tmp_path / "test.tex"
+    tex_filepath.write_text(data="\\documentclass{article}\\begin{document}x\\end{document}")
+    ini_filepath = tmp_path / "wjs.ini"
+    ini_filepath.write_text(data="[wjs]\ntimeout_compilation = not-a-number\n")
+    with tex_filepath.open(mode="rb") as tex_fhandle, ini_filepath.open(mode="rb") as ini_fhandle:
+        response = requests.post(
+            url,
+            files={"file": tex_fhandle, "ini": ini_fhandle},
+            timeout=11,
+        )
+    assert response.status_code == 500
+    assert "exception during watermark" in response.text
+    assert "not-a-number" in response.text
