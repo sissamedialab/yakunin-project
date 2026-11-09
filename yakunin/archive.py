@@ -307,6 +307,14 @@ class Archive:
         tex_engine = kwargs.get("tex_engine", "latexmk -pv- -pdf")
         tex_options = [
             "-interaction=nonstopmode",
+            # Do not read any latexmkrc: they are Perl code, and ./latexmkrc or ./.latexmkrc
+            # would come from the submitted archive (arbitrary code execution).
+            # This also disables the system and user rc files.
+            "-norc",
+            # Force mode: keep going after errors (e.g. run bibtex even if pdflatex failed
+            # because of a missing figure), to produce a PDF whenever possible.
+            # latexmk still exits with non-zero status if any error happened.
+            "-f",
         ]
 
         timeout = kwargs.get("timeout_compilation", 59)
@@ -319,6 +327,14 @@ class Archive:
         # the tex master can be inside a subdir of "work"
         # we move there and keep only the basename of the tex master
         tex_dir = self.tex_master.parent
+
+        # If the author provided a .bbl, use it as it is and never run bibtex/biber: many
+        # submissions have .bib files that bibtex cannot process (repeated entries, broken
+        # .bst, etc.) and the resulting PDF would have undefined citations.
+        # NB: check before doing anything else in the work dir, so that we see the author's .bbl.
+        if self.tex_master.with_suffix(".bbl").exists():
+            self.task_logger.debug(f"Found {self.tex_master.with_suffix('.bbl').name}: will not run bibtex/biber")
+            tex_options.append("-bibtex-")
 
         # correct known problems in the tex source
         self.tideup_src()

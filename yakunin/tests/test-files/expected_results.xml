@@ -7,7 +7,7 @@
     <expected-lines>
       <line>INFO Unpacked 💩submission/01-test.tex as copy</line>
       <line>INFO Successfully compiled 01-test.tex</line>
-      <line>DEBUG ready to compile 01-test.tex in 💩/work with command latexmk -pv- -pdf -interaction=nonstopmode 01-test.tex</line>
+      <line>DEBUG ready to compile 01-test.tex in 💩/work with command latexmk -pv- -pdf -interaction=nonstopmode -norc -f 01-test.tex</line>
     </expected-lines>
   </archive>
 
@@ -22,7 +22,7 @@
     <expected-lines>
       <line>INFO Unpacked 💩submission/01-test.tex as copy</line>
       <line>INFO Successfully compiled 01-test.tex</line>
-      <line>DEBUG ready to compile 01-test.tex in 💩/work with command latexmk -pv- -dvi -pdfps -interaction=nonstopmode 01-test.tex</line>
+      <line>DEBUG ready to compile 01-test.tex in 💩/work with command latexmk -pv- -dvi -pdfps -interaction=nonstopmode -norc -f 01-test.tex</line>
     </expected-lines>
     <expected-files>
       <file>01-test.dvi</file>
