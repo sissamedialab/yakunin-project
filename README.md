@@ -54,6 +54,66 @@ docker run --name yakunin --rm -p 1235:8889 registry.gitlab.sissamedialab.it/wjs
 [*] See [here](https://docs.gitlab.com/ee/user/packages/container_registry/authenticate_with_container_registry.html)
 for details.
 
+## Local development
+
+To run Yakunin locally with all the needed dependencies (LaTeX, medialab-sty, libreoffice, pdftk, ...) but with your
+local code, mount your working copy into one of the docker images (e.g. `yakunin:production`, or the
+`yakunin:$ML_VERSION` image built by CI from `main`). From the root of the repository:
+
+``` bash
+docker run -ti --rm --name yakunin-dev \
+  --mount type=bind,src="$PWD",dst=/workdir \
+  -e PYTHONPATH=/workdir \
+  -e DEBUG=True \
+  -p 1235:8889 \
+  registry.gitlab.sissamedialab.it/wjs/yakunin-project/yakunin:production \
+  python3 yakunin_service/manage.py runserver 0.0.0.0:8889
+```
+
+The service will run at `localhost:1235` (try `curl http://localhost:1235/test/`).
+
+What the options do:
+
+- `--mount type=bind,src="$PWD",dst=/workdir`: replaces the code in the image with your working copy.
+- `-e PYTHONPATH=/workdir`: the image also has a (non-editable) copy of `yakunin` and `yakunin_service` installed with
+  pip. `manage.py` lives in `yakunin_service/`, so without this Python would import that installed copy instead of
+  your local code.
+- `-e DEBUG=True`: Django's debug mode (it must be the string `True`, see `yakunin_service/settings.py`).
+- `-p 1235:8889`: exposes the service on `localhost:1235` (the same port as `compose.dev.yaml`).
+- `-ti --rm --name yakunin-dev`: runs in the foreground (logs in the terminal, `Ctrl-C` to stop), removes the container
+  when it stops and gives it a name for the `docker` commands below.
+- `manage.py runserver`: the image's default command is `daphne ... yakunin_service.asgi:application`, which has no
+  auto-reload; `runserver` (provided by daphne, since `daphne` is in `INSTALLED_APPS`) serves the same ASGI app and
+  restarts it whenever a `.py` file changes.
+
+The container user has uid/gid 1000:1000, so files written in your working copy (e.g. `__pycache__`) belong to you if
+you have the same uid/gid (usually the case on single-user Linux machines). The yakunin log is written in
+`/tmp/yakunin.log` inside the container.
+
+To run the tests or get a shell, replace the last line with the command, e.g.:
+
+``` bash
+  ... \
+  python3 -m pytest -n 8
+```
+
+### Restarting after code changes
+
+- Changes to `.py` files are picked up automatically by `runserver` (look for `... changed, reloading.` in the logs). The
+  reload restarts the whole process, so a request that is running while you save is probably cut short.
+- With the image's default command (`daphne`, no auto-reload), the local code is still used (daphne puts the current
+  directory `/workdir` first in Python's import path), but you need to restart the service: `docker restart
+  yakunin-dev` (from another terminal), or stop it with `Ctrl-C` and run the `docker run` command again.
+- If you change the dependencies in `pyproject.toml`, the image is out of date: install them in the running container
+  (the changes last until the container is removed)
+
+  ``` bash
+  docker exec yakunin-dev pip install --break-system-packages \
+    --extra-index-url=https://gitlab.sissamedialab.it/api/v4/projects/60/packages/pypi/simple '.[service,test]'
+  ```
+
+  or use a more recent image (or build a new one with the `build-commit-image` CI job).
+
 # Tests
 
 At the moment, tests are kept outside of the yakunin, package For a

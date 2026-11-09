@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseServerError
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from websockets.sync.client import ClientConnection, connect
@@ -103,11 +103,9 @@ def test_service(request: HttpRequest) -> HttpResponse:
     return HttpResponse(f"I'm up and running on {request.build_absolute_uri()}\n")
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def mkpdf(request: HttpRequest) -> HttpResponse:
+def _process_archive(request: HttpRequest, task: str, completed_msg: str) -> HttpResponse:
     """
-    Generate PDF from any given file.
+    Run the Archive method `task` on the posted file and send back the resulting archive.
 
     Honor wjs.ini.
     Send feedback throught the given ws name.
@@ -120,84 +118,52 @@ def mkpdf(request: HttpRequest) -> HttpResponse:
             ws_logger.started("PDF generation started...")
 
         archive_path, temp_dir = get_main_file(request)
-        ws_logger.info(f"Working on {archive_path}")
-
-        options = ini_to_kwargs(request)
-        ws_logger.debug(f"Options: {options}")
-
+        output_archive_path = None
         try:
-            archive = Archive(archive=archive_path, extra_logger=ws_logger)
-            archive.mkpdf(**options)
-            output_archive_path = Path(archive.submission_archive())
+            ws_logger.info(f"Working on {archive_path}")
 
-        except Exception as e:  # noqa: BLE001
-            ws_logger.error("Raised exception during conversion")  # noqa: TRY400
-            logger.exception(str(e))
-        else:
-            ws_logger.info("PDF generation completed")
+            try:
+                options = ini_to_kwargs(request)
+                ws_logger.debug(f"Options: {options}")
+                archive = Archive(archive=archive_path, extra_logger=ws_logger)
+                getattr(archive, task)(**options)
+                output_archive_path = Path(archive.submission_archive())
+            except Exception as e:  # noqa: BLE001
+                ws_logger.error("Raised exception during conversion")  # noqa: TRY400
+                logger.exception(str(e))
+                return HttpResponseServerError(f"Yakunin raised an exception during {task}: {e}\n")
+            ws_logger.info(completed_msg)
 
-        file_data = output_archive_path.read_bytes()
-        response = HttpResponse(file_data, content_type="application/gzip")
-        response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
+            file_data = output_archive_path.read_bytes()
+            response = HttpResponse(file_data, content_type="application/gzip")
+            response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
 
-        logger.info(
-            f"Sending back {output_archive_path.name} as per request. Cleaning {temp_dir} and {output_archive_path}",
-        )
+            logger.info(
+                f"Sending back {output_archive_path.name} as per request. "
+                f"Cleaning {temp_dir} and {output_archive_path}",
+            )
 
-        ws_logger.info(msg="Response sent back.")
-
-        shutil.rmtree(temp_dir)
-        output_archive_path.unlink()
+            ws_logger.info(msg="Response sent back.")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            if output_archive_path:
+                output_archive_path.unlink(missing_ok=True)
 
     return response
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
+def mkpdf(request: HttpRequest) -> HttpResponse:
+    """Generate PDF from any given file."""
+    return _process_archive(request, "mkpdf", "PDF generation completed")
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
 def watermark(request: HttpRequest) -> HttpResponse:
-    """
-    Generate PDF from any given file and watermark it.
-
-    Honor wjs.ini.
-    """
-    feedback_ws_url = request.POST.get("feedback_ws_url", None)
-    with WSLogger(feedback_ws_url=feedback_ws_url) as ws_logger:
-        if settings.DEBUG:
-            ws_logger.started("🎌 PDF generation started...")
-        else:
-            ws_logger.started("PDF generation started...")
-
-        archive_path, temp_dir = get_main_file(request)
-        ws_logger.info(f"Working on {archive_path}")
-
-        options = ini_to_kwargs(request)
-        ws_logger.debug(f"Options: {options}")
-
-        try:
-            archive = Archive(archive=archive_path, extra_logger=ws_logger)
-            archive.watermark(**options)
-            output_archive_path = Path(archive.submission_archive())
-
-        except Exception as e:  # noqa: BLE001
-            ws_logger.error("Raised exception during conversion")  # noqa: TRY400
-            logger.exception(str(e))
-        else:
-            ws_logger.info("Watermarking process completed")
-
-        file_data = output_archive_path.read_bytes()
-        response = HttpResponse(file_data, content_type="application/gzip")
-        response["Content-Disposition"] = f'attachment; filename="{output_archive_path.name}"'
-
-        logger.info(
-            f"Sending back {output_archive_path.name} as per request. Cleaning {temp_dir} and {output_archive_path}",
-        )
-
-        ws_logger.info(msg="Response sent back.")
-
-        shutil.rmtree(temp_dir)
-        output_archive_path.unlink()
-
-    return response
+    """Generate PDF from any given file and watermark it."""
+    return _process_archive(request, "watermark", "Watermarking process completed")
 
 
 def get_main_file(request: HttpRequest) -> tuple[Path, Path]:

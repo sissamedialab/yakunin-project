@@ -21,6 +21,7 @@ from .utils import (
     TaskLogger,
     aruspica_mime,
     has_documentclass,
+    mkstemp_path,
     read_pitstop_report,
     setup_yakunin,
 )
@@ -478,30 +479,24 @@ class Archive:
 
         # auxiliary files
         # the watermark in a postscript file
-        watermark_ps_name = Path(
-            tempfile.mkstemp(
-                prefix="watermark",
-                suffix=".ps",
-                dir=self.work_dir,
-            )[1],
+        watermark_ps_name = mkstemp_path(
+            prefix="watermark",
+            suffix=".ps",
+            dir=self.work_dir,
         )
 
         # the pdf watermark (generated from the ps)
-        watermark_name = Path(
-            tempfile.mkstemp(
-                prefix="watermark",
-                suffix=".pdf",
-                dir=self.work_dir,
-            )[1],
+        watermark_name = mkstemp_path(
+            prefix="watermark",
+            suffix=".pdf",
+            dir=self.work_dir,
         )
 
         # the final result (the main pdf watermarked)
-        watermarked_name = Path(
-            tempfile.mkstemp(
-                prefix=self._main_pdf_se(),
-                suffix="-wm.pdf",
-                dir=self.work_dir,
-            )[1],
+        watermarked_name = mkstemp_path(
+            prefix=self._main_pdf_se(),
+            suffix="-wm.pdf",
+            dir=self.work_dir,
         )
 
         if not pages_to_rotate:
@@ -689,12 +684,10 @@ showpage
                 )
             else:
                 # save the output to a new file
-                zip_file = Path(
-                    tempfile.mkstemp(
-                        prefix=self._main_pdf_se(),
-                        suffix="-pitstop.zip",
-                        dir=self.work_dir,
-                    )[1],
+                zip_file = mkstemp_path(
+                    prefix=self._main_pdf_se(),
+                    suffix="-pitstop.zip",
+                    dir=self.work_dir,
                 )
                 zip_file.write_bytes(response.content)
                 self.task_logger.debug("Response received from Pitstop validation server.")
@@ -817,11 +810,9 @@ showpage
             else:
                 # got a good response (200) from the server
                 # save the output to a new file
-                pdfa_name = Path(
-                    tempfile.mkstemp(
-                        prefix=self._main_pdf_se(),
-                        dir=self.work_dir,
-                    )[1],
+                pdfa_name = mkstemp_path(
+                    prefix=self._main_pdf_se(),
+                    dir=self.work_dir,
                 )
                 pdfa_name.write_bytes(response.content)
                 self.task_logger.debug("Response received from PDF/A transformation server.")
@@ -926,9 +917,9 @@ showpage
 """)
                 self.task_logger.append_content(stdout_file)
 
-        filename = tempfile.mkstemp()[1]
+        filename = mkstemp_path()
         result = shutil.make_archive(filename, "gztar", self.temp_dir)
-        pathlib.Path(filename).unlink()
+        filename.unlink()
         return result
 
     def read_log(self):
@@ -1150,11 +1141,9 @@ showpage
             # got a good response (200) from the server
             # save the output to a new file
             self.main_pdf = re.sub(r"\.docx?$", "", pathlib.Path(file).name)
-            pdf_name = Path(
-                tempfile.mkstemp(
-                    prefix=self._main_pdf_se(),
-                    dir=self.work_dir,
-                )[1],
+            pdf_name = mkstemp_path(
+                prefix=self._main_pdf_se(),
+                dir=self.work_dir,
             )
             pdf_name.write_bytes(response.content)
             self.task_logger.debug("Response received from doc-to-pdf server.")

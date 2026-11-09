@@ -95,6 +95,19 @@ def setup_yakunin():
     merge_with_config_file(args)
 
 
+def mkstemp_path(**kwargs) -> Path:
+    """
+    Create a temporary file and return its path.
+
+    Like tempfile.mkstemp(), but close the file descriptor that mkstemp
+    opens: we only need the (unique) file name, and leaving the fd open
+    leaks it for the whole life of the process (see "Too many open files").
+    """
+    fd, name = tempfile.mkstemp(**kwargs)
+    os.close(fd)
+    return Path(name)
+
+
 def aruspica_mime(archive_filename: str) -> str:
     """
     Epatoscopia del file per determinarne il tipo.
